@@ -1,0 +1,2 @@
+import {chromium} from 'playwright';
+const b=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,args:['--use-angle=swiftshader']});const p=await b.newPage({viewport:{width:1440,height:900}});p.on('pageerror',e=>console.log('ERROR',e.message));await p.goto('http://127.0.0.1:5173');await p.waitForTimeout(3500);await p.screenshot({path:'test-results/town-start.png'});console.log(await p.locator('body').innerText());await b.close();

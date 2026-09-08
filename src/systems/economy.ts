@@ -100,7 +100,7 @@ export function computeProduction(
   let generation = 0,
     consumption = 0,
     income = 0;
-  const output: Bag = { wood: 0, stone: 0, iron: 0, redstone: 0, food: 0 };
+  const output: Bag = { wood: 0, stone: 0, iron: 0, redstone: 0, food: 0,wheat:0,flour:0,bread:0,furniture:0 };
   const offline: string[] = [];
   for (const b of buildings) generation += defs[b.type].power * b.level;
   let available = Math.min(maxEnergy, energy + generation);
@@ -131,4 +131,4 @@ export function computeProduction(
 export const upgradePrice = (b: Building) =>
   Math.round(defs[b.type].upgradeCost * Math.pow(1.65, b.level - 1));
 export const expansionPrice = (count: number) =>
-  Math.round(900 * Math.pow(1.13, Math.max(0, count - 5)));
+  Math.round(300 * Math.pow(1.16, Math.max(0, count - 9)));

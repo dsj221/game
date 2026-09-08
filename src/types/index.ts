@@ -1,5 +1,5 @@
 export type WorldId = "overworld" | "nether" | "end";
-export type Resource = "wood" | "stone" | "iron" | "redstone" | "food";
+export type Resource = "wood" | "stone" | "iron" | "redstone" | "food" | "wheat" | "flour" | "bread" | "furniture";
 export type Bag = Record<Resource, number>;
 export interface BuildingDefinition {
   id: string;
@@ -19,6 +19,7 @@ export interface BuildingDefinition {
   unlockRequirements?: string;
   population?: number;
   materials?: Partial<Bag>;
+  town?: { category:'住宅'|'生产'|'商业'|'公共'|'道路'|'装饰'|'进阶'; jobs:number; wage:number; upkeep:number; unlock:number; cycle?:number; recipe?:Partial<Bag>; output?:Partial<Bag>; sells?:Resource; price?:number; wholesale?:number; happiness?:number; health?:number; environment?:number; rent?:number; capacity?:number };
 }
 export interface Building {
   id: string;
@@ -29,6 +30,7 @@ export interface Building {
   rotation: number;
   level: number;
   born: number;
+  paused?:boolean;
 }
 export interface Tile {
   x: number;
@@ -45,6 +47,19 @@ export interface Npc {
   modelType: string;
   workplace: string;
   phase: number;
+  age?:number;
+  family?:string;
+  home?:string;
+  income?:number;
+  wallet?:number;
+  happiness?:number;
+  health?:number;
+  needs?:{food:number;fun:number;shopping:number};
+  state?:string;
+  destination?:string;
+  likes?:string[];
+  recent?:string;
+  lastPurchase?:number;
 }
 export interface WorldDefinition {
   id: WorldId;
@@ -56,4 +71,4 @@ export interface WorldDefinition {
   ambientLight: number;
 }
 export type Panel =
-  "shop" | "village" | "industry" | "book" | "detail" | "npc" | "studio" | null;
+  "shop" | "village" | "industry" | "book" | "detail" | "npc" | "studio" | "quests" | "daily" | null;

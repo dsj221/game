@@ -30,6 +30,8 @@ import {
 import World from "./world/World";
 import Drawer from "./components/Drawer";
 import Settings from "./components/Settings";
+import { TopHUD, BuildMenu, TownGoal, TownNews } from "./components/TownHUD";
+import { useTownStore as T } from "./stores/useTownStore";
 import { useGameLoop } from "./hooks/useGameLoop";
 import {
   useBuildingStore as B,
@@ -103,74 +105,7 @@ export default function App() {
     <div
       className={`app ${dark ? "dark-world" : ""} ${!s.border ? "borderless" : ""}`}
     >
-      <header className="topbar">
-        <a className="brand" href="#" onClick={(e) => e.preventDefault()}>
-          <span className="brand-mark">
-            <span />
-            <span />
-            <span />
-          </span>
-          <span>
-            块间<small>KUAI–BLOCK</small>
-          </span>
-        </a>
-        <div className="wealth">
-          <Diamond size={22} />
-          <div>
-            <b data-testid="currency">{format(r.currency)}</b>
-            <small>
-              <span className="small-dot" /> +{format(r.income)} / 秒
-            </small>
-          </div>
-        </div>
-        <div className="energy">
-          <Zap size={18} />
-          <div>
-            <b>
-              {Math.floor(r.energy)} <em>/ 480 E</em>
-            </b>
-            <div className="energy-track">
-              <i style={{ width: `${(r.energy / 480) * 100}%` }} />
-            </div>
-          </div>
-          {b.offline.length > 0 && (
-            <span className="power-alert">能源不足</span>
-          )}
-        </div>
-        <div className="top-actions">
-          {[
-            [
-              s.sound ? "关闭声音" : "开启声音",
-              s.sound ? Volume2 : VolumeX,
-              () => S.setState({ sound: !s.sound }),
-            ],
-            ["帮助", HelpCircle, () => U.setState({ modal: "help" })],
-            [
-              "分享世界",
-              Share2,
-              () => {
-                exportSave();
-                notify("已导出世界存档，可将 JSON 文件分享给朋友");
-              },
-            ],
-            ["保存世界", Save, () => save()],
-            ["世界设置", Settings2, () => U.setState({ modal: "settings" })],
-          ].map(([label, Icon, fn]) => {
-            const I = Icon as typeof Volume2;
-            return (
-              <button
-                className="icon-button"
-                key={label as string}
-                aria-label={label as string}
-                title={label as string}
-                onClick={fn as () => void}
-              >
-                <I size={19} />
-              </button>
-            );
-          })}
-        </div>
-      </header>
+      <TopHUD />
       <main className={ui.panel ? "has-drawer" : ""}>
         <section className={`world-area ${w.interior ? "interior" : ""}`}>
           <div
@@ -225,28 +160,14 @@ export default function App() {
                   : "不必匆忙，你的世界正在慢慢生长。"}
               </p>
             </div>
-            <button
-              className="next-goal"
-              onClick={() =>
-                g.built ? panel("shop", "扩地+") : beginBuild("house")
-              }
-            >
-              <span>
-                下一个目标 <ArrowUpRight size={13} />
-              </span>
-              <b>
-                <span className="goal-icon">
-                  {g.built ? <Check size={13} /> : <Plus size={13} />}
-                </span>
-                {g.built ? "开垦新的大陆" : "建造你的第一座小屋"}
-              </b>
-            </button>
+            <TownGoal />
           </div>
+          <TownNews />
           <div className="world-meta">
             <span className="small-dot" />{" "}
             {w.interior
               ? "频道正在直播"
-              : `${worlds[w.current].name} · 第 ${Math.floor(g.ticks / 600) + 1} 天`}
+              : `${worlds[w.current].name} · 第 ${T.getState().day} 天`}
             <span>
               {s.weather.includes("rain") ? (
                 <CloudRain size={14} />
@@ -298,7 +219,7 @@ export default function App() {
           {!w.interior && !ui.placement && (
             <div className="collect-area">
               <div className="resonance">
-                <span>世界共振</span>
+                <span>林间馈赠</span>
                 <div>
                   <i style={{ width: `${g.resonance}%` }} />
                 </div>
@@ -324,7 +245,7 @@ export default function App() {
               >
                 <Pickaxe size={21} />
                 <b>采集</b>
-                <span>+{60 + g.built * 4}</span>
+                <span>+1 木材</span>
                 <small>按住</small>
               </button>
               <span className="collect-hint">一锤一镐，也是一种生活。</span>
@@ -342,7 +263,7 @@ export default function App() {
                 </b>
                 <small>
                   {ui.placement === "expand"
-                    ? `开垦费用 ${format(expansionPrice(w.tiles[w.current].length))} 晶体`
+                    ? `开垦费用 ${format(expansionPrice(w.tiles[w.current].length))} 金币`
                     : `R 旋转 · 方向 ${ui.rotation * 90}° · Esc 取消`}
                 </small>
               </div>
@@ -359,65 +280,7 @@ export default function App() {
         </section>
         <Drawer />
       </main>
-      <footer className="bottom-bar">
-        <div className="inventory">
-          <span title="木材">
-            <Leaf size={15} />
-            {format(r.bag.wood)}
-          </span>
-          <span title="石头">
-            <Package size={15} />
-            {format(r.bag.stone)}
-          </span>
-          <span title="铁矿">
-            <Pickaxe size={15} />
-            {format(r.bag.iron)}
-          </span>
-          <span title="食物">
-            <span className="seed-icon" />
-            {format(r.bag.food)}
-          </span>
-        </div>
-        <nav className="main-nav">
-          {w.interior
-            ? ["节目", "频道设备", "整理房间", "室内装扮", "收礼"].map(
-                (v, i) => (
-                  <button
-                    key={v}
-                    className={i === 0 ? "active" : ""}
-                    onClick={() =>
-                      i === 0 ? panel("studio", "节目") : studioAction(v)
-                    }
-                  >
-                    {v}
-                    {v === "收礼" && g.gifts > 0 && <small>{g.gifts}</small>}
-                  </button>
-                ),
-              )
-            : (
-                [
-                  ["商城", ShoppingBag, "shop"],
-                  ["村庄", Users, "village"],
-                  ["工业", Factory, "industry"],
-                  ["图鉴", BookOpen, "book"],
-                ] as const
-              ).map(([label, I, p], i) => (
-                <button
-                  className={ui.panel === p ? "active" : ""}
-                  key={p}
-                  onClick={() => panel(ui.panel === p ? null : p)}
-                >
-                  <kbd>{i + 1}</kbd>
-                  <I size={18} />
-                  {label}
-                </button>
-              ))}
-        </nav>
-        <div className="save-status">
-          <span className="small-dot" />
-          {g.lastSaved ? "进度已自动保存" : "本地世界 · 自动存档"}
-        </div>
-      </footer>
+      <BuildMenu />
       {ui.toast && (
         <div className="toast" role="status">
           <Check size={16} />

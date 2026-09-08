@@ -93,6 +93,28 @@ export const BuildingModel = memo(function BuildingModel({
   const wood = dark ? "#56383c" : "#8b7052";
   const light = active ? (night ? "#ffcb79" : "#b4c9b4") : "#414c47";
   const glow = night && active ? 1.1 : 0;
+  if (type === "bench") return <group>
+    <Box p={[0,.25,0]} s={[.8,.09,.3]} c="#bc946b"/>
+    <Box p={[0,.46,-.12]} s={[.8,.25,.06]} c="#b79168"/>
+    {[-.28,.28].map(x=><Box key={x} p={[x,.12,0]} s={[.07,.25,.26]} c="#586c54"/>)}
+  </group>;
+  if (type === "flowerbed" || type === "park") return <group>
+    <Box p={[0,.06,0]} s={[.95,.12,.95]} c="#a4b17d"/>
+    <Box p={[0,.13,0]} s={[.72,.09,.68]} c="#8a7654"/>
+    {[-.24,0,.24].flatMap((x,i)=>[-.22,0,.22].map((z,j)=><group key={`${i}-${j}`}><Box p={[x,.23,z]} s={[.04,.2,.04]} c="#6b8e58"/><Box p={[x,.34,z]} s={[.14,.1,.14]} c={["#dba596","#e8d58e","#c5b5cc"][(i+j)%3]}/></group>))}
+    {type === "park" && <><group position={[-.28,0,-.28]} scale={.6}><BuildingModel type="tree"/></group><group position={[.25,0,.35]} scale={.55}><BuildingModel type="bench"/></group></>}
+  </group>;
+  if (["bakery", "clinic", "apartment"].includes(type)) {
+    const floors = type === "apartment" ? 3 : 1, color = type === "clinic" ? "#a0b2a4" : "#ba8869";
+    return <group>
+      <Box p={[0,.07,0]} s={[.98,.14,.92]} c="#c6c6ac"/>
+      <Box p={[0,.18+floors*.31,0]} s={[.78,floors*.62,.72]} c="#eee4ce"/>
+      <Box p={[0,.22+floors*.62,0]} s={[.94,.17,.85]} c={color}/>
+      {Array.from({length:floors},(_,i)=>[-.23,.23].map(x=><Box key={`${i}-${x}`} p={[x,.48+i*.62,.37]} s={[.17,.23,.035]} c={light} glow={glow}/>))}
+      <Box p={[0,.31,.37]} s={[.19,.38,.04]} c="#826e56"/>
+      {type === "clinic" ? <><Box p={[0,.95,.05]} s={[.1,.32,.12]} c="#f3efdd"/><Box p={[0,.95,.05]} s={[.3,.1,.12]} c="#f3efdd"/></> : type === "bakery" ? <><Box p={[.27,.94,-.23]} s={[.17,.43,.18]} c="#8d7560"/><Box p={[0,.54,.53]} s={[.86,.07,.29]} c="#d5b07d"/>{[-.24,0,.24].map(x=><Box key={x} p={[x,.22,.51]} s={[.18,.12,.13]} c="#d8a15d"/>)}</> : null}
+    </group>;
+  }
   if (type === "road" || type === "bridge")
     return (
       <Box

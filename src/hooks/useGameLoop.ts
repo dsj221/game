@@ -24,10 +24,8 @@ export function useGameLoop() {
       }
       if (e.key.toLowerCase() === "r" && U.getState().placement)
         U.setState((s) => ({ rotation: (s.rotation + 1) % 4 }));
-      if (["1", "2", "3", "4"].includes(e.key) && !W.getState().interior)
-        panel(
-          (["shop", "village", "industry", "book"] as const)[Number(e.key) - 1],
-        );
+      if (["1", "2", "3", "4",'5','6'].includes(e.key) && !W.getState().interior)
+        U.setState({panel:'shop',tab:'发现',category:['住宅','生产','商业','公共','道路','装饰'][Number(e.key)-1]});
     };
     const before = () => save(true);
     window.addEventListener("keydown", down);
@@ -45,7 +43,7 @@ export function useGameLoop() {
   useEffect(() => {
     if (!collecting) return;
     collect();
-    const timer = setInterval(collect, 300);
+    const timer = setInterval(collect, 800);
     const stop = () => U.setState({ collecting: false });
     window.addEventListener("pointerup", stop);
     window.addEventListener("pointercancel", stop);

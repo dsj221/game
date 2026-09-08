@@ -1,3 +1,4 @@
+import { useTownStore as T } from "../stores/useTownStore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
@@ -212,8 +213,8 @@ function Camera({ interior, world }: { interior: boolean; world: WorldId }) {
   const base = useRef(35);
   useEffect(() => {
     base.current = Math.min(
-      size.width / (interior ? 14 : 25),
-      size.height / (interior ? 12 : 21),
+      size.width / (interior ? 14 : 18),
+      size.height / (interior ? 12 : 16),
     );
     phase.current = 0;
   }, [size, interior]);
@@ -224,7 +225,7 @@ function Camera({ interior, world }: { interior: boolean; world: WorldId }) {
       interior ? 9 : 24,
       interior ? 11 : 22,
     );
-    ref.current?.target.set(0, 0, interior ? 0 : -1.5);
+    ref.current?.target.set(0, 0, 0);
     (camera as THREE.OrthographicCamera).zoom = base.current * 0.84;
     camera.updateProjectionMatrix();
   }, [world, interior, reset, camera]);
@@ -290,7 +291,9 @@ function Scene() {
     { npcs } = N();
   const settings = S(),
     ui = U(),
-    floats = G((s) => s.floating);
+    floats = G((s) => s.floating),
+    pulses = T((s) => s.pulses),
+    rainEvent = T(s => s.events.some(e => e.type === "rain"));
   const local = useMemo(
     () => buildings.filter((b) => b.world === current),
     [buildings, current],
@@ -382,7 +385,7 @@ function Scene() {
                     ? night && settings.weather.includes("lanterns")
                     : night
                 }
-                active={!offline.includes(b.id)}
+                active={!b.paused && !offline.includes(b.id)}
                 selected={selected === b.id}
               />
             ))}
@@ -449,6 +452,7 @@ function Scene() {
               />
             </group>
           )}
+          {pulses.map(p => { const b = local.find(b => b.id === p.building); return b ? <Html key={p.id} position={[b.x,1.8,b.z]} center style={{pointerEvents:"none"}}><span className="float-production">{p.text}</span></Html> : null; })}
           {floats.map(
             (f) =>
               Date.now() - f.id < 1700 && (
@@ -465,13 +469,13 @@ function Scene() {
                   }
                   center
                 >
-                  <span className="float-income">+{f.value}</span>
+                  <span className="float-income">{f.value ? `+${f.value}` : "+1 木材"}</span>
                 </Html>
               ),
           )}
           {current === "end" && <Dragon />}
           <Atmosphere
-            weather={settings.weather}
+            weather={rainEvent ? [...settings.weather, "rain"] : settings.weather}
             world={current}
             speed={settings.speed}
           />
@@ -538,6 +542,7 @@ function Diagnostics() {
     w.worldDiagnostics = {
       picked: () => lastBuildingClick,
       state: () => ({
+        town: T.getState(),
         r: R.getState(),
         w: W.getState(),
         b: B.getState(),

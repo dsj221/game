@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import type { Bag, Building, Npc, Panel, Tile, WorldId } from "../types";
-import { initialBuildings, initialNpcs, initialTiles } from "../data/initial";
-const buildings = initialBuildings();
+import {settlementBuildings,settlementNpcs,settlementTiles} from '../data/settlement';
+import {emptyBag} from '../data/town';
+const buildings = settlementBuildings();
 export const useResourceStore = create<{
   currency: number;
   energy: number;
@@ -11,10 +12,10 @@ export const useResourceStore = create<{
   generation: number;
   consumption: number;
 }>(() => ({
-  currency: 6500,
+  currency: 1000,
   energy: 480,
   maxEnergy: 480,
-  bag: { wood: 120, stone: 100, iron: 50, redstone: 20, food: 80 },
+  bag: {...emptyBag(),wood:30,food:20},
   income: 0,
   generation: 0,
   consumption: 0,
@@ -26,7 +27,7 @@ export const useWorldStore = create<{
   interior: boolean;
 }>(() => ({
   current: "overworld",
-  tiles: initialTiles(),
+  tiles: settlementTiles(),
   visited: ["overworld"],
   interior: false,
 }));
@@ -37,7 +38,7 @@ export const useBuildingStore = create<{
   connected: string[];
 }>(() => ({ buildings, selected: null, offline: [], connected: [] }));
 export const useNpcStore = create<{ npcs: Npc[]; selected: string | null }>(
-  () => ({ npcs: initialNpcs(buildings), selected: null }),
+  () => ({ npcs: settlementNpcs(buildings), selected: null }),
 );
 export const useUIStore = create<{
   panel: Panel;
@@ -51,6 +52,7 @@ export const useUIStore = create<{
   toast: string;
   collecting: boolean;
   cameraReset: number;
+  category:string;
 }>(() => ({
   panel: null,
   tab: "",
@@ -63,6 +65,7 @@ export const useUIStore = create<{
   toast: "",
   collecting: false,
   cameraReset: 0,
+  category:'住宅',
 }));
 export const useSettingsStore = create<{
   sound: boolean;
@@ -79,7 +82,7 @@ export const useSettingsStore = create<{
   weather: ["lanterns"],
   cycle: true,
   speed: 1,
-  hour: 10,
+  hour: 7,
   sky: "natural",
   border: true,
   effects: true,

@@ -24,58 +24,9 @@ export function Scenery({ world }: { world: string }) {
       ),
     [],
   );
-  return world === "overworld" ? (
-    <group>
-      <mesh
-        ref={pond}
-        position={[5.9, 0.065, -3.05]}
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <planeGeometry args={[1.5, 0.7]} />
-        <meshStandardMaterial
-          color="#8ebbb8"
-          roughness={0.25}
-          metalness={0.12}
-        />
-      </mesh>
-      <Box p={[6, 0.09, -3.48]} s={[1.6, 0.14, 0.12]} c="#b5bba1" />
-      <Box p={[6, 0.09, -2.62]} s={[1.6, 0.14, 0.12]} c="#b5bba1" />
-      {[-5.5, -4.5, -3.5, -2.5].map((x) => (
-        <group key={x}>
-          <Box p={[x, 0.2, 3.7]} s={[0.05, 0.4, 0.05]} c="#bdac83" />
-          <Box p={[x + 0.5, 0.27, 3.7]} s={[1, 0.055, 0.05]} c="#cbb992" />
-        </group>
-      ))}
-      {[-5, -3, -1, 1, 3].map((x, i) => (
-        <group key={x}>
-          <Box p={[x + 0.48, 0.12, -4.6]} s={[0.18, 0.24, 0.18]} c="#b39c72" />
-          <Box
-            p={[x + 0.48, 0.29, -4.6]}
-            s={[0.2, 0.12, 0.2]}
-            c={i % 2 ? "#c48f79" : "#b5b16e"}
-          />
-          <Box p={[x + 0.48, 0.2, -5.4]} s={[0.05, 0.4, 0.05]} c="#9a896b" />
-          <Box p={[x + 0.48, 0.41, -5.4]} s={[0.16, 0.12, 0.12]} c="#7d9072" />
-        </group>
-      ))}
-      {points.map(([x, y, z], i) => (
-        <Box
-          key={i}
-          p={[x, y, z]}
-          s={[0.045, 0.13, 0.07]}
-          c={i % 3 ? "#92a36a" : "#b6bc80"}
-        />
-      ))}
-      {s.weather.includes("station") && (
-        <group position={[-6, 0, -6]}>
-          <Box p={[0, 0.6, 0]} s={[0.06, 1.2, 0.06]} c="#627968" />
-          <Box p={[0, 1.25, 0]} s={[0.55, 0.08, 0.12]} c="#eee6cb" />
-          <Box p={[0.2, 1.4, 0]} s={[0.06, 0.3, 0.06]} c="#83957b" />
-        </group>
-      )}
-    </group>
-  ) : null;
+  return world === "overworld" ? <group>{[-3.8,-2.8,-1.8,1.8,2.8,3.8].map((x,i)=><group key={x}><Box p={[x,0.13,4.3]} s={[0.07,0.26,0.07]} c="#819365"/><Box p={[x,0.29,4.3]} s={[0.13,0.09,0.13]} c={i%2?"#cfac83":"#b9bf85"}/></group>)}</group> : null;
 }
+
 export function Smoke({
   positions,
   speed,

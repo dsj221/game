@@ -1,4 +1,12 @@
 import { useState } from "react";
+import {
+  TownOverview,
+  FacilityInfo,
+  CitizenInfo,
+  QuestPanel,
+  DailySummary,
+  ProductionPanel,
+} from "./TownPanels";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpRight,
@@ -54,13 +62,15 @@ import { ModelPreview } from "./ModelPreview";
 import { npcRuntime } from "../npcs/People";
 import type { BuildingDefinition, Resource } from "../types";
 const labels = {
-  shop: ["ALREADY PART OF YOUR WORLD", "我的设施"],
+  shop: ["MAKE ROOM FOR EVERYDAY LIFE", "建造小镇"],
   village: ["MEET YOUR NEIGHBORS", "村庄"],
   industry: ["BUILT TO WORK", "工业"],
   book: ["THE BOOK OF POSSIBILITIES", "世界蓝图"],
   detail: ["A LITTLE PART OF YOUR WORLD", "设施详情"],
   npc: ["A FAMILIAR FACE", "世界居民"],
   studio: ["YOUR LITTLE STUDIO", "频道控制台"],
+  quests: ["LITTLE WISHES", "邻里愿望"],
+  daily: ["A DAY IN OUR TOWN", "小镇日报"],
 };
 function Tabs({ items }: { items: string[] }) {
   const tab = U((s) => s.tab);
@@ -111,7 +121,7 @@ function Card({
                 ? `发电 +${d.power} E / 秒`
                 : d.energyCost
                   ? `用电 ${d.energyCost} E / 秒`
-                  : `收入 +${d.incomePerSecond} / 秒`}
+                  : d.town?.capacity ? `可住 ${d.town.capacity} 人 · Lv.${d.town.unlock}` : d.town?.jobs ? `${d.town.jobs} 个岗位 · Lv.${d.town.unlock} 解锁` : `Lv.${d.town?.unlock || 1} · 美好日常`}
           </span>
         </div>
       </div>
@@ -147,7 +157,8 @@ function Card({
   );
 }
 function Shop() {
-  const [category, setCategory] = useState("全部");
+  const category = U((s) => s.category),
+    setCategory = (category: string) => U.setState({ category });
   const tab = U((s) => s.tab) || "发现",
     world = W((s) => s.current),
     tiles = W((s) => s.tiles),
@@ -190,16 +201,7 @@ function Shop() {
       ) : (
         <>
           <div className="filters">
-            {[
-              "全部",
-              "工具",
-              "村庄",
-              "红石",
-              "下界",
-              "末地",
-              "工程",
-              "直播",
-            ].map((c) => (
+            {["全部", "住宅", "生产", "商业", "公共", "道路", "装饰", "进阶"].map((c) => (
               <button
                 className={category === c ? "active" : ""}
                 key={c}
@@ -438,40 +440,7 @@ function Detail() {
       </span>
       <h2>{d.name}</h2>
       <p className="description">{d.description}</p>
-      <div className="metric-row">
-        <div>
-          <b>{b.level} 级</b>
-          <span>建筑等级</span>
-        </div>
-        <div>
-          <b>
-            {state.offline.includes(b.id)
-              ? "停机"
-              : state.connected.includes(b.id)
-                ? "100%"
-                : "50%"}
-          </b>
-          <span>基础物流效率</span>
-        </div>
-      </div>
-      <div className="production-lines">
-        <span>
-          晶体收入 <b>+{d.incomePerSecond * b.level} / 秒（效率前）</b>
-        </span>
-        {Object.entries(d.production).map(([r, n]) => (
-          <span key={r}>
-            {resourceNames[r as Resource]}{" "}
-            <b>+{(n * b.level).toFixed(1)} / 秒</b>
-          </span>
-        ))}
-        <span>
-          电力{" "}
-          <b>
-            {d.power ? `+${d.power * b.level}` : `−${d.energyCost * b.level}`} E
-            / 秒
-          </b>
-        </span>
-      </div>
+      <FacilityInfo key={b.id} b={b} />
       <button
         className="move-button"
         onClick={() =>
@@ -492,7 +461,7 @@ function Detail() {
       >
         {b.level >= d.maxLevel
           ? "已达最高等级"
-          : `${format(upgradePrice(b))} 晶体 · 升级`}
+          : `${format(upgradePrice(b))} 金币 · 升级`}
       </button>
       {b.type === "studio" && (
         <button
@@ -529,34 +498,8 @@ function Detail() {
   );
 }
 function NpcDetail() {
-  const state = N(),
-    n = state.npcs.find((n) => n.id === state.selected);
-  G((s) => s.ticks);
-  if (!n) return null;
-  const b = B.getState().buildings.find((b) => b.id === n.workplace);
-  return (
-    <>
-      <div className={`npc-hero ${n.modelType}`}>
-        <Users size={64} />
-      </div>
-      <h2>{n.name}</h2>
-      <p className="description">每个忙碌的身影，都在为小世界做一点事。</p>
-      <div className="production-lines">
-        {[
-          ["职业", n.profession],
-          ["等级", `${n.level} 级`],
-          ["当前状态", npcRuntime.get(n.id)?.status || "休息中"],
-          ["效率", `${Math.round(n.efficiency * 100)}%`],
-          ["工作地点", b ? defs[b.type].name : "中央道路"],
-        ].map(([a, v]) => (
-          <span key={a}>
-            {a}
-            <b>{v}</b>
-          </span>
-        ))}
-      </div>
-    </>
-  );
+  const n = N((s) => s.npcs.find((n) => n.id === s.selected));
+  return n ? <CitizenInfo n={n} /> : null;
 }
 function Book() {
   const tab = U((s) => s.tab) || "全部",
@@ -709,7 +652,7 @@ function StudioPanel() {
             </div>
           </div>
           <button className="primary wide" onClick={() => studioAction("收礼")}>
-            收礼 · {g.gifts * 40} 晶体
+            收礼 · {g.gifts * 40} 金币
           </button>
           <p className="note">
             直播每 15 秒收到一份礼物。节目适合当前世界时观众增长更快。
@@ -721,7 +664,7 @@ function StudioPanel() {
           <h3>一份田园伴手礼</h3>
           <p>准备 30 份食物、20 份木材，寄给屏幕另一端的朋友。</p>
           <button className="primary wide" onClick={() => studioAction("订单")}>
-            交付订单 · 获得 500 晶体
+            交付订单 · 获得 500 金币
           </button>
         </div>
       )}
@@ -757,15 +700,19 @@ export default function Drawer() {
             {active === "shop" ? (
               <Shop />
             ) : active === "village" ? (
-              <Village />
+              <TownOverview />
             ) : active === "industry" ? (
-              <Industry />
+              <ProductionPanel />
             ) : active === "detail" ? (
               <Detail />
             ) : active === "book" ? (
               <Book />
             ) : active === "npc" ? (
               <NpcDetail />
+            ) : active === "quests" ? (
+              <QuestPanel />
+            ) : active === "daily" ? (
+              <DailySummary />
             ) : (
               <StudioPanel />
             )}

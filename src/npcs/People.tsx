@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect,useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { Box } from "../buildings/Model";
@@ -28,6 +28,7 @@ export function Person({
     started: false,
     returning: false,
   });
+  useEffect(()=>{state.current.path=[];state.current.pause=0},[npc.destination,roads]);
   useFrame((_, dt) => {
     if (!ref.current || !roads.length) return;
     const s = state.current;
@@ -41,7 +42,7 @@ export function Person({
     if (s.pause > 0) {
       s.pause -= dt * speed;
       npcRuntime.set(npc.id, {
-        status: s.returning ? "正在工作" : "整理货物",
+        status: npc.state||'整理货物',
         x: p.x,
         z: p.z,
       });
@@ -49,8 +50,8 @@ export function Person({
     }
     if (!s.path.length) {
       const work = buildings.find((b) => b.id === npc.workplace);
-      const home = buildings.find((b) => b.type === "market") || work;
-      const destination = s.returning ? home : work;
+      const home = buildings.find((b) => b.id === npc.home) || work;
+      const destination = buildings.find(b=>b.id===npc.destination)||home||work;
       let goal = s.index;
       if (destination) {
         let distance = Infinity;
@@ -65,6 +66,7 @@ export function Person({
       }
       s.path = roadPath(roads, s.index, goal);
       if (!s.path.length) {
+        if(goal===s.index&&npc.state&&!npc.state.includes('散步')){s.pause=.5;npcRuntime.set(npc.id,{status:npc.state,x:p.x,z:p.z});return;}
         const neighbor = roads
           .map((r, i) => ({ r, i }))
           .filter(
@@ -99,7 +101,7 @@ export function Person({
       p.y = Math.sin(s.elapsed * 9) * 0.018;
     }
     npcRuntime.set(npc.id, {
-      status: s.returning ? "运送货物" : "前往工作地点",
+      status: npc.state||'前往目的地',
       x: p.x,
       z: p.z,
     });

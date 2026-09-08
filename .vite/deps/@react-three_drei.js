@@ -16,19 +16,7 @@ import {
   useInstanceHandle,
   useLoader,
   useThree
-} from "./chunk-5R6Q5ZM3.js";
-import "./chunk-II2CKZMC.js";
-import {
-  require_client
-} from "./chunk-NIWTKFRF.js";
-import "./chunk-RBO73NZH.js";
-import {
-  create
-} from "./chunk-V62FGQNK.js";
-import "./chunk-WBBMM7TZ.js";
-import {
-  require_react
-} from "./chunk-SNSCXBIF.js";
+} from "./chunk-G5PYM6MN.js";
 import {
   AddEquation,
   AdditiveBlending,
@@ -223,6 +211,18 @@ import {
   WireframeGeometry,
   ZeroFactor
 } from "./chunk-ZOHQ645K.js";
+import "./chunk-II2CKZMC.js";
+import {
+  require_client
+} from "./chunk-NIWTKFRF.js";
+import "./chunk-RBO73NZH.js";
+import {
+  create
+} from "./chunk-V62FGQNK.js";
+import "./chunk-WBBMM7TZ.js";
+import {
+  require_react
+} from "./chunk-SNSCXBIF.js";
 import {
   __commonJS,
   __export,

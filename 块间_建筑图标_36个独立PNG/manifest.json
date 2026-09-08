@@ -1,0 +1,294 @@
+{
+  "game": "块间 · 属于你的小小世界",
+  "count": 36,
+  "icons": [
+    {
+      "id": 1,
+      "key": "crate",
+      "name_cn": "木制储物箱",
+      "category": "storage",
+      "file_512": "png_512/01_crate.png",
+      "file_256": "png_256/01_crate.png"
+    },
+    {
+      "id": 2,
+      "key": "workshop_stall",
+      "name_cn": "手工作坊",
+      "category": "production",
+      "file_512": "png_512/02_workshop_stall.png",
+      "file_256": "png_256/02_workshop_stall.png"
+    },
+    {
+      "id": 3,
+      "key": "market_stall",
+      "name_cn": "果蔬摊位",
+      "category": "commercial",
+      "file_512": "png_512/03_market_stall.png",
+      "file_256": "png_256/03_market_stall.png"
+    },
+    {
+      "id": 4,
+      "key": "thatched_cottage",
+      "name_cn": "茅草小屋",
+      "category": "residential",
+      "file_512": "png_512/04_thatched_cottage.png",
+      "file_256": "png_256/04_thatched_cottage.png"
+    },
+    {
+      "id": 5,
+      "key": "stone_well",
+      "name_cn": "石井",
+      "category": "public",
+      "file_512": "png_512/05_stone_well.png",
+      "file_256": "png_256/05_stone_well.png"
+    },
+    {
+      "id": 6,
+      "key": "vegetable_garden",
+      "name_cn": "蔬菜田",
+      "category": "agriculture",
+      "file_512": "png_512/06_vegetable_garden.png",
+      "file_256": "png_256/06_vegetable_garden.png"
+    },
+    {
+      "id": 7,
+      "key": "flower_planter",
+      "name_cn": "花箱",
+      "category": "decoration",
+      "file_512": "png_512/07_flower_planter.png",
+      "file_256": "png_256/07_flower_planter.png"
+    },
+    {
+      "id": 8,
+      "key": "carpenter_workbench",
+      "name_cn": "木工台",
+      "category": "production",
+      "file_512": "png_512/08_carpenter_workbench.png",
+      "file_256": "png_256/08_carpenter_workbench.png"
+    },
+    {
+      "id": 9,
+      "key": "blacksmith_forge",
+      "name_cn": "铁匠炉",
+      "category": "production",
+      "file_512": "png_512/09_blacksmith_forge.png",
+      "file_256": "png_256/09_blacksmith_forge.png"
+    },
+    {
+      "id": 10,
+      "key": "clay_kiln",
+      "name_cn": "陶窑",
+      "category": "production",
+      "file_512": "png_512/10_clay_kiln.png",
+      "file_256": "png_256/10_clay_kiln.png"
+    },
+    {
+      "id": 11,
+      "key": "steam_machine",
+      "name_cn": "蒸汽机",
+      "category": "production",
+      "file_512": "png_512/11_steam_machine.png",
+      "file_256": "png_256/11_steam_machine.png"
+    },
+    {
+      "id": 12,
+      "key": "greenhouse",
+      "name_cn": "温室",
+      "category": "agriculture",
+      "file_512": "png_512/12_greenhouse.png",
+      "file_256": "png_256/12_greenhouse.png"
+    },
+    {
+      "id": 13,
+      "key": "signpost",
+      "name_cn": "路牌",
+      "category": "decoration",
+      "file_512": "png_512/13_signpost.png",
+      "file_256": "png_256/13_signpost.png"
+    },
+    {
+      "id": 14,
+      "key": "arched_bridge",
+      "name_cn": "木拱桥",
+      "category": "infrastructure",
+      "file_512": "png_512/14_arched_bridge.png",
+      "file_256": "png_256/14_arched_bridge.png"
+    },
+    {
+      "id": 15,
+      "key": "village_gate",
+      "name_cn": "村庄大门",
+      "category": "infrastructure",
+      "file_512": "png_512/15_village_gate.png",
+      "file_256": "png_256/15_village_gate.png"
+    },
+    {
+      "id": 16,
+      "key": "magic_portal",
+      "name_cn": "传送门",
+      "category": "special",
+      "file_512": "png_512/16_magic_portal.png",
+      "file_256": "png_256/16_magic_portal.png"
+    },
+    {
+      "id": 17,
+      "key": "shrine",
+      "name_cn": "小神社",
+      "category": "public",
+      "file_512": "png_512/17_shrine.png",
+      "file_256": "png_256/17_shrine.png"
+    },
+    {
+      "id": 18,
+      "key": "water_tower",
+      "name_cn": "水塔",
+      "category": "infrastructure",
+      "file_512": "png_512/18_water_tower.png",
+      "file_256": "png_256/18_water_tower.png"
+    },
+    {
+      "id": 19,
+      "key": "carrot_patch",
+      "name_cn": "胡萝卜田",
+      "category": "agriculture",
+      "file_512": "png_512/19_carrot_patch.png",
+      "file_256": "png_256/19_carrot_patch.png"
+    },
+    {
+      "id": 20,
+      "key": "hay_shed",
+      "name_cn": "干草棚",
+      "category": "agriculture",
+      "file_512": "png_512/20_hay_shed.png",
+      "file_256": "png_256/20_hay_shed.png"
+    },
+    {
+      "id": 21,
+      "key": "lantern_post",
+      "name_cn": "路灯",
+      "category": "decoration",
+      "file_512": "png_512/21_lantern_post.png",
+      "file_256": "png_256/21_lantern_post.png"
+    },
+    {
+      "id": 22,
+      "key": "log_pile",
+      "name_cn": "木材堆",
+      "category": "resource",
+      "file_512": "png_512/22_log_pile.png",
+      "file_256": "png_256/22_log_pile.png"
+    },
+    {
+      "id": 23,
+      "key": "water_shrine_tower",
+      "name_cn": "水源塔",
+      "category": "public",
+      "file_512": "png_512/23_water_shrine_tower.png",
+      "file_256": "png_256/23_water_shrine_tower.png"
+    },
+    {
+      "id": 24,
+      "key": "gazebo",
+      "name_cn": "凉亭",
+      "category": "public",
+      "file_512": "png_512/24_gazebo.png",
+      "file_256": "png_256/24_gazebo.png"
+    },
+    {
+      "id": 25,
+      "key": "central_fountain",
+      "name_cn": "中心喷泉",
+      "category": "public",
+      "file_512": "png_512/25_central_fountain.png",
+      "file_256": "png_256/25_central_fountain.png"
+    },
+    {
+      "id": 26,
+      "key": "windmill",
+      "name_cn": "风车磨坊",
+      "category": "production",
+      "file_512": "png_512/26_windmill.png",
+      "file_256": "png_256/26_windmill.png"
+    },
+    {
+      "id": 27,
+      "key": "tool_shop",
+      "name_cn": "工具店",
+      "category": "commercial",
+      "file_512": "png_512/27_tool_shop.png",
+      "file_256": "png_256/27_tool_shop.png"
+    },
+    {
+      "id": 28,
+      "key": "wood_fired_oven",
+      "name_cn": "柴火烤炉",
+      "category": "production",
+      "file_512": "png_512/28_wood_fired_oven.png",
+      "file_256": "png_256/28_wood_fired_oven.png"
+    },
+    {
+      "id": 29,
+      "key": "camp_tent",
+      "name_cn": "营地帐篷",
+      "category": "residential",
+      "file_512": "png_512/29_camp_tent.png",
+      "file_256": "png_256/29_camp_tent.png"
+    },
+    {
+      "id": 30,
+      "key": "wooden_crane",
+      "name_cn": "木制起重机",
+      "category": "production",
+      "file_512": "png_512/30_wooden_crane.png",
+      "file_256": "png_256/30_wooden_crane.png"
+    },
+    {
+      "id": 31,
+      "key": "vine_pergola",
+      "name_cn": "葡萄花架",
+      "category": "decoration",
+      "file_512": "png_512/31_vine_pergola.png",
+      "file_256": "png_256/31_vine_pergola.png"
+    },
+    {
+      "id": 32,
+      "key": "mine_entrance",
+      "name_cn": "矿洞入口",
+      "category": "production",
+      "file_512": "png_512/32_mine_entrance.png",
+      "file_256": "png_256/32_mine_entrance.png"
+    },
+    {
+      "id": 33,
+      "key": "market_pavilion",
+      "name_cn": "市场亭",
+      "category": "commercial",
+      "file_512": "png_512/33_market_pavilion.png",
+      "file_256": "png_256/33_market_pavilion.png"
+    },
+    {
+      "id": 34,
+      "key": "birdhouse",
+      "name_cn": "鸟屋",
+      "category": "decoration",
+      "file_512": "png_512/34_birdhouse.png",
+      "file_256": "png_256/34_birdhouse.png"
+    },
+    {
+      "id": 35,
+      "key": "crystal_pool",
+      "name_cn": "水晶池",
+      "category": "special",
+      "file_512": "png_512/35_crystal_pool.png",
+      "file_256": "png_256/35_crystal_pool.png"
+    },
+    {
+      "id": 36,
+      "key": "crystal_obelisk",
+      "name_cn": "水晶方尖碑",
+      "category": "special",
+      "file_512": "png_512/36_crystal_obelisk.png",
+      "file_256": "png_256/36_crystal_obelisk.png"
+    }
+  ]
+}

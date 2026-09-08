@@ -1,4 +1,5 @@
 import type { BuildingDefinition, WorldDefinition, WorldId } from "../types";
+import {townConfig,townNames,townPrices} from './town.ts';
 export const worlds: Record<WorldId, WorldDefinition> = {
   overworld: {
     id: "overworld",
@@ -152,6 +153,14 @@ export const definitions: BuildingDefinition[] = [
     description: "守望星海的古老石柱。",
   }),
 ];
+for(const [id,modelType,description] of [
+ ['residence','house','舒适的双层住宅，提供 4 个居住名额。'],['apartment','apartment','更紧凑的居住空间，给八位邻居一个家。'],
+ ['bakery','bakery','面粉 ×2 → 面包 ×4。缺少面粉时暂停生产。'],['breadshop','shop','从仓库采购面包，邻居来消费时才产生营业额。'],
+ ['park','park','散步、聊天、看花。增加幸福度与环境评分，每日需要维护。'],['clinic','clinic','照顾居民健康，减轻流感影响。需要一名医护人员。'],
+ ['flowerbed','flowerbed','一小簇花，就能让街角明亮起来。'],['bench','bench','给匆忙的脚步留一个休息的地方。'],
+ ['carpenter','lumber','木材 ×5 → 家具 ×2，为小镇集市提供商品。'],['cafe','shop','一份甜点，一段悠闲时光。消费满足娱乐需求。'],['school','house','邻里孩子的学堂，提高家庭幸福度。'],
+])definitions.push(def(id,townNames[id], '村庄',modelType,townPrices[id],0,{description}));
+for(const d of definitions){d.town=townConfig[d.id];if(!d.town)continue;d.incomePerSecond=0;d.category=d.town.category;d.name=townNames[d.id]||d.name;d.cost=townPrices[d.id]??d.cost;d.upgradeCost=Math.round(d.cost*.8);if(d.town.capacity)d.population=d.town.capacity;if(['house','farm','lumber','windmill','shop'].includes(d.id)){d.materials=d.id==='house'?{wood:5}:undefined;d.description={house:'提供 2 个居住名额。有人入住后才产生租金；升级增加容量。',farm:'30 秒收获小麦 ×5、食物 ×3。员工不足会延长生产周期。',lumber:'20 秒生产木材 ×5，为住宅与家具制造提供原料。',windmill:'小麦 ×3 → 面粉 ×4，每个生产周期 18 秒。',shop:'采购食物，居民付款后获得营业额。无人消费时仍有工资和维护成本。'}[d.id]!;}if(d.id==='tree')d.production={};}
 export const defs = Object.fromEntries(
   definitions.map((d) => [d.id, d]),
 ) as Record<string, BuildingDefinition>;
@@ -161,6 +170,7 @@ export const resourceNames = {
   iron: "铁矿",
   redstone: "红石",
   food: "食物",
+  wheat:'小麦',flour:'面粉',bread:'面包',furniture:'家具',
 };
 export const achievementDefs = [
   ["first", "万物第一次", "完成一次采集"],

@@ -8,11 +8,16 @@ import {
 } from "../stores";
 import { defs } from "../data/definitions";
 import { notify } from "../game/actions";
-export const SAVE_KEY = "kuai-block-save-v1";
+import {useTownStore as T} from '../stores/useTownStore';
+import {emptyBag,initialTown} from '../data/town';
+import {makeCitizen} from '../data/settlement';
+import {metrics} from '../game/TownSimulation';
+export const SAVE_KEY = "kuai-block-save-v2";
+const LEGACY_KEY='kuai-block-save-v1';
 let resetting = false;
 export function snapshot() {
   return {
-    version: 1,
+    version: 2,
     savedAt: Date.now(),
     resources: R.getState(),
     world: W.getState(),
@@ -20,6 +25,7 @@ export function snapshot() {
     npcs: N.getState().npcs,
     game: { ...G.getState(), floating: [] },
     settings: S.getState(),
+    town:T.getState(),
   };
 }
 export function save(silent = false) {
@@ -41,15 +47,16 @@ const num = (v: unknown, min = 0, max = 1e15) =>
 export function validate(data: unknown): ReturnType<typeof snapshot> {
   assert(data && typeof data === "object", "无效的存档");
   const d = data as ReturnType<typeof snapshot>;
-  assert(d.version === 1, "不支持的存档版本");
+  assert(d.version === 1 || d.version === 2, "不支持的存档版本");
+  if(d.version===1){d.version=2;d.resources.bag={...emptyBag(),...d.resources.bag};const homes=d.buildings.filter(b=>defs[b.type]?.town?.capacity);d.npcs=d.npcs.map((n,i)=>({...makeCitizen(n.id,i,homes.filter(h=>h.world===n.world)[Math.floor(i/2)%Math.max(1,homes.filter(h=>h.world===n.world).length)]?.id||'',n.world),...n}));d.town=initialTown();d.town.legacy=true;d.town.minute=d.settings.hour*60;d.town.day=Math.floor(d.game.ticks/360)+1;d.town.nextEvent=d.game.ticks+95;d.town.level=Math.min(4,Math.max(1,Math.floor(d.npcs.filter(n=>n.modelType==='villager').length/6)+1));d.town.metrics=metrics(d.buildings,d.npcs,d.resources.bag);}
   assert(
     d.resources &&
-      num(d.resources.currency) &&
+      num(d.resources.currency,-1e15) &&
       num(d.resources.energy, 0, 480) &&
       d.resources.maxEnergy === 480,
     "资源数据无效",
   );
-  for (const k of ["wood", "stone", "iron", "redstone", "food"] as const)
+  for (const k of Object.keys(emptyBag()) as (keyof ReturnType<typeof emptyBag>)[])
     assert(num(d.resources.bag?.[k]), "材料数据无效");
   assert(
     d.world &&
@@ -111,7 +118,7 @@ export function validate(data: unknown): ReturnType<typeof snapshot> {
     ids.add(b.id);
     occupied.add(k);
   }
-  assert(Array.isArray(d.npcs) && d.npcs.length <= 200, "居民数据无效");
+  assert(Array.isArray(d.npcs) && d.npcs.length <= 500, "居民数据无效");
   for (const n of d.npcs)
     assert(
       typeof n.id === "string" &&
@@ -164,6 +171,26 @@ export function validate(data: unknown): ReturnType<typeof snapshot> {
       num(d.settings.volume, 0, 1),
     "设置数据无效",
   );
+  assert(d.town&&d.town.revision===2&&num(d.town.day,1)&&num(d.town.minute,0,1439.999)&&Number.isInteger(d.town.level)&&num(d.town.level,1,4),'小镇时间或等级无效');
+  for(const key of ['completed','claimed','events','eventHistory','reports','notices','pulses'] as const)assert(Array.isArray(d.town[key]),'小镇进度无效');
+  for(const key of ['migrationProgress','departProgress','peakPopulation','totalSales','nextEvent','seed'] as const)assert(num(d.town[key]),'经营状态无效');
+  assert(d.town.facilities&&d.town.builtCounts&&d.town.metrics&&d.town.ledger,'缺少经营数据');
+  for(const f of Object.values(d.town.facilities))for(const key of ['progress','stock','staff','efficiency','revenue','costs','customers','satisfaction','priceFactor','produced','dailyRevenue','dailyCosts','dailyCustomers'] as const)assert(num(f[key]),'店铺数据无效');
+  for(const n of d.npcs)if(n.modelType==='villager'){assert(num(n.wallet)&&num(n.happiness,0,100)&&num(n.health,0,100)&&num(n.age,0,130)&&n.needs&&typeof n.home==='string','居民生活数据无效');for(const need of Object.values(n.needs))assert(num(need,0,100),'居民需求无效');}
+  const ledgerKeys = ["revenue","wages","maintenance","purchases","rent","sales","arrivals","departures","startHappiness"] as const;
+  for (const ledger of [d.town.ledger, ...d.town.reports]) {
+    for (const k of ledgerKeys) assert(num(ledger[k]), "日报金额无效");
+    for (const bag of [ledger.produced, ledger.consumed]) {
+      assert(bag && typeof bag === "object", "日报资源无效");
+      for (const [key,value] of Object.entries(bag)) assert(key in emptyBag() && num(value), "日报资源无效");
+    }
+  }
+  for (const r of d.town.reports) assert(num(r.day,1) && num(r.profit,-1e15) && num(r.population) && num(r.happiness,0,100), "历史日报无效");
+  for (const e of d.town.events) assert(["rain","festival","flu"].includes(e.type) && num(e.remaining,0,10000) && num(e.duration,1,10000) && typeof e.title === "string", "事件数据无效");
+  for (const v of Object.values(d.town.builtCounts)) assert(num(v), "建造进度无效");
+  for (const k of ["completed","claimed","eventHistory"] as const) assert(d.town[k].every(v => typeof v === "string"), "任务进度无效");
+  for (const k of ["food","fun","shopping"] as const) for (const n of d.npcs.filter(n=>n.modelType==="villager")) assert(num(n.needs?.[k],0,100), "居民需求无效");
+  d.town.metrics = metrics(d.buildings,d.npcs,d.resources.bag,d.town.facilities);
   return d;
 }
 function apply(d: ReturnType<typeof snapshot>) {
@@ -178,10 +205,11 @@ function apply(d: ReturnType<typeof snapshot>) {
   N.setState({ npcs: d.npcs, selected: null });
   G.setState({ ...d.game, floating: [], lastSaved: d.savedAt });
   S.setState(d.settings);
+  T.setState(d.town,true);
 }
 export function load() {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(SAVE_KEY)||localStorage.getItem(LEGACY_KEY);
     if (raw) apply(validate(JSON.parse(raw)));
   } catch {
     notify("旧存档无法读取，已保留原文件；可导入备份继续");
@@ -214,5 +242,7 @@ export async function importSave(file: File) {
 export function newGame() {
   resetting = true;
   localStorage.removeItem(SAVE_KEY);
+  localStorage.setItem(LEGACY_KEY+'-backup',localStorage.getItem(LEGACY_KEY)||'');
+  localStorage.removeItem(LEGACY_KEY);
   location.reload();
 }

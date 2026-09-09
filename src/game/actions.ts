@@ -290,11 +290,12 @@ export function buildAt(x: number, z: number) {
   for (const [k, v] of Object.entries(d.materials || {}))
     bag[k as Resource] -= v;
   R.setState({ currency: r.currency - d.cost, bag });
+  const id = uid();
   B.setState({
     buildings: [
       ...all,
       {
-        id: uid(),
+        id,
         type: d.id,
         footprint: [...d.size],
         world,
@@ -309,6 +310,10 @@ export function buildAt(x: number, z: number) {
   G.setState((s) => ({ built: s.built + 1 }));
   T.setState((t) => ({
     builtCounts: { ...t.builtCounts, [d.id]: (t.builtCounts[d.id] || 0) + 1 },
+    pulses: [
+      ...t.pulses,
+      { id: `build-${id}`, building: id, text: `-${d.cost} 金币`, tick: G.getState().ticks },
+    ].slice(-12),
   }));
   achieve("build");
   if (["tree", "road", "farm"].includes(d.id)) achieve(d.id);

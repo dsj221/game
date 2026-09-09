@@ -32,6 +32,8 @@ import {LandOverlay} from './LandOverlay';
 import {placementReport} from '../systems/placement';
 import type { Building, Tile, WorldId } from "../types";
 let lastBuildingClick: { id: string; time: number } | null = null;
+const popOut = (t: number) =>
+  1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2;
 function Instances({
   items,
   color,
@@ -176,6 +178,9 @@ function BuildingView({
   const ref = useRef<THREE.Group>(null!);
   useFrame(({ clock }) => {
     ref.current.position.y = 0;
+    const base = (width + depth) / 2;
+    const age = b.born ? (Date.now() - b.born) / 550 : 1;
+    ref.current.scale.setScalar(age < 1 ? base * popOut(age) : base);
     if (b.type === "tree" || b.type === "netherplant" || b.type === "farm")
       ref.current.rotation.z = Math.sin(clock.elapsedTime * 0.8 + b.x) * 0.018;
     if (b.type === "core")
@@ -362,7 +367,7 @@ function Scene() {
   const bg =
     current === "overworld"
       ? night
-        ? "#46574f"
+        ? "#293a34"
         : settings.sky === "warm"
           ? "#ece5d6"
           : d.background
@@ -498,7 +503,7 @@ function Scene() {
               /></group>
             </group>
           )}
-          {pulses.map(p => { const b = local.find(b => b.id === p.building); return b ? <Html key={p.id} position={[b.x,1.8,b.z]} center style={{pointerEvents:"none"}}><span className="float-production">{p.text}</span></Html> : null; })}
+          {pulses.map(p => { const b = local.find(b => b.id === p.building); return b ? <Html key={p.id} position={[b.x,1.8,b.z]} center style={{pointerEvents:"none"}}><span className={`float-production ${p.text.startsWith("-") ? "cost" : ""}`}>{p.text}</span></Html> : null; })}
           {floats.map(
             (f) =>
               Date.now() - f.id < 1700 && (

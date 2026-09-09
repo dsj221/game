@@ -128,6 +128,23 @@ function Card({
         </div>
       </div>
       <p>{d.description}</p>
+      {d.town && (() => {
+        const cfg = d.town;
+        const chips = [];
+        if (cfg.capacity) chips.push(`可住${cfg.capacity}人`);
+        if (cfg.rent) chips.push(`租金${cfg.rent}/日`);
+        if (cfg.happiness) chips.push(`幸福+${cfg.happiness}`);
+        if (cfg.environment) chips.push(`环境+${cfg.environment}`);
+        if (cfg.upkeep) chips.push(`维护${cfg.upkeep}/日`);
+        if (cfg.jobs) chips.push(`${cfg.jobs}岗位·工资${cfg.wage}/日`);
+        if (cfg.cycle) chips.push(`周期${cfg.cycle}s`);
+        if (cfg.output) Object.entries(cfg.output).forEach(([r,n]) => chips.push(`产出${n}${resourceNames[r as keyof typeof resourceNames]}`));
+        if (cfg.recipe) Object.entries(cfg.recipe).forEach(([r,n]) => chips.push(`消耗${n}${resourceNames[r as keyof typeof resourceNames]}`));
+        if (cfg.sells) chips.push(`售价${cfg.price}`);
+        if (cfg.wholesale) chips.push(`进货${cfg.wholesale}`);
+        if (cfg.health) chips.push('提供医疗');
+        return chips.length ? <div className="town-chips">{chips.join(' · ')}</div> : null;
+      })()}
       <div className="card-action">
         {b ? (
           <button className="text-button" onClick={() => selectBuilding(b.id)}>

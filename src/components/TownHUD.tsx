@@ -67,14 +67,14 @@ export function TopHUD() {
         </b>
         <small>慢慢来，日子还长</small>
       </button>
-      <div className="hud-pill coins">
+      <div className="hud-pill coins primary">
         <Coins size={20} />
         <div>
           <b data-testid="currency">{format(r.currency)}</b>
           <small>{`今日净额 ${(t.ledger.revenue - t.ledger.wages - t.ledger.maintenance - t.ledger.purchases).toFixed(0)}`}</small>
         </div>
       </div>
-      <button className="hud-pill" onClick={() => panel("village")}>
+      <button className="hud-pill primary" onClick={() => panel("village")}>
         <Users size={18} />
         <div>
           <b data-testid="population">
@@ -83,7 +83,7 @@ export function TopHUD() {
           <small>住在这里的人</small>
         </div>
       </button>
-      <button className="hud-pill" onClick={() => panel("village")}>
+      <button className="hud-pill primary" onClick={() => panel("village")}>
         <Heart size={18} />
         <div>
           <b>{Math.round(t.metrics.happiness)}%</b>

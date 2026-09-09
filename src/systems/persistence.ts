@@ -7,6 +7,7 @@ import {
   useWorldStore as W,
 } from "../stores";
 import { defs } from "../data/definitions";
+import { buildingCells } from "../data/footprints";
 import { notify } from "../game/actions";
 import {useTownStore as T} from '../stores/useTownStore';
 import {emptyBag,initialTown} from '../data/town';
@@ -113,10 +114,14 @@ export function validate(data: unknown): ReturnType<typeof snapshot> {
         ),
       "建筑超出边界",
     );
-    const k = `${b.world},${b.x},${b.z}`;
-    assert(!occupied.has(k), "建筑发生重叠");
+    assert(b.footprint === undefined || (Array.isArray(b.footprint) && b.footprint.length === 2 && b.footprint.every((v:number)=>Number.isInteger(v)&&v>=1&&v<=3)), "建筑占地无效");
+    for (const p of buildingCells(b)) {
+      assert(d.world.tiles[b.world].some(t=>Math.abs(t.x*3-p.x)<=1&&Math.abs(t.z*3-p.z)<=1), "建筑占地超出边界");
+      const k = `${b.world},${p.x},${p.z}`;
+      assert(!occupied.has(k), "建筑发生重叠");
+      occupied.add(k);
+    }
     ids.add(b.id);
-    occupied.add(k);
   }
   assert(Array.isArray(d.npcs) && d.npcs.length <= 500, "居民数据无效");
   for (const n of d.npcs)
@@ -171,12 +176,16 @@ export function validate(data: unknown): ReturnType<typeof snapshot> {
       num(d.settings.volume, 0, 1),
     "设置数据无效",
   );
-  assert(d.town&&d.town.revision===2&&num(d.town.day,1)&&num(d.town.minute,0,1439.999)&&Number.isInteger(d.town.level)&&num(d.town.level,1,4),'小镇时间或等级无效');
+  assert(d.town&&d.town.revision===2&&num(d.town.day,1)&&num(d.town.minute,0,1439.999)&&Number.isInteger(d.town.level)&&num(d.town.level,1,5),'小镇时间或等级无效');
   for(const key of ['completed','claimed','events','eventHistory','reports','notices','pulses'] as const)assert(Array.isArray(d.town[key]),'小镇进度无效');
   for(const key of ['migrationProgress','departProgress','peakPopulation','totalSales','nextEvent','seed'] as const)assert(num(d.town[key]),'经营状态无效');
   assert(d.town.facilities&&d.town.builtCounts&&d.town.metrics&&d.town.ledger,'缺少经营数据');
   for(const f of Object.values(d.town.facilities))for(const key of ['progress','stock','staff','efficiency','revenue','costs','customers','satisfaction','priceFactor','produced','dailyRevenue','dailyCosts','dailyCustomers'] as const)assert(num(f[key]),'店铺数据无效');
-  for(const n of d.npcs)if(n.modelType==='villager'){assert(num(n.wallet)&&num(n.happiness,0,100)&&num(n.health,0,100)&&num(n.age,0,130)&&n.needs&&typeof n.home==='string','居民生活数据无效');for(const need of Object.values(n.needs))assert(num(need,0,100),'居民需求无效');}
+  for(const n of d.npcs)if(n.modelType==='villager'){assert(num(n.wallet)&&num(n.happiness,0,100)&&num(n.health,0,100)&&num(n.age,0,130)&&n.needs&&typeof n.home==='string','居民生活数据无效');for(const need of Object.values(n.needs))assert(num(need,0,100),'居民需求无效');
+    if(n.position)assert(num(n.position.x,-300,300)&&num(n.position.z,-300,300),'居民位置无效');
+    if(n.route)assert(Array.isArray(n.route)&&n.route.length<=4500&&n.route.every(p=>num(p.x,-300,300)&&num(p.z,-300,300)),'居民路径无效');
+    if(n.travelProgress!==undefined)assert(num(n.travelProgress,0,100),'居民移动进度无效');
+  }
   const ledgerKeys = ["revenue","wages","maintenance","purchases","rent","sales","arrivals","departures","startHappiness"] as const;
   for (const ledger of [d.town.ledger, ...d.town.reports]) {
     for (const k of ledgerKeys) assert(num(ledger[k]), "日报金额无效");

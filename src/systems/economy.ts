@@ -1,5 +1,6 @@
 import type { Building, Tile, Bag, Npc } from "../types/index.ts";
 import { defs } from "../data/definitions.ts";
+import { buildingCells } from "../data/footprints.ts";
 export const roadType = (type: string) => type === "road" || type === "bridge";
 export const key = (x: number, z: number) => `${x},${z}`;
 export const onLand = (x: number, z: number, tiles: Tile[]) =>
@@ -10,12 +11,15 @@ export function canPlace(
   tiles: Tile[],
   buildings: Building[],
   ignore?: string,
+  size: [number,number] = [1,1],
+  rotation = 0,
 ) {
+  const cells=buildingCells({x,z,rotation,footprint:size});
+  const occupied=new Set(buildings.filter(b=>b.id!==ignore).flatMap(b=>buildingCells(b).map(p=>key(p.x,p.z))));
   return (
     Number.isInteger(x) &&
     Number.isInteger(z) &&
-    onLand(x, z, tiles) &&
-    !buildings.some((b) => b.id !== ignore && b.x === x && b.z === z)
+    cells.every(p=>onLand(p.x,p.z,tiles)&&!occupied.has(key(p.x,p.z)))
   );
 }
 export function edgeTiles(tiles: Tile[]) {
@@ -43,13 +47,13 @@ export function connectedBuildings(buildings: Building[]) {
   for (const b of buildings.filter(
     (b) => b.type === "market" || b.type === "warehouse",
   ))
-    for (const [dx, dz] of [
+    for (const cell of buildingCells(b)) for (const [dx, dz] of [
       [1, 0],
       [-1, 0],
       [0, 1],
       [0, -1],
     ]) {
-      const k = key(b.x + dx, b.z + dz);
+      const k = key(cell.x + dx, cell.z + dz);
       if (roads.has(k) && !visited.has(k)) {
         visited.add(k);
         queue.push(k);
@@ -81,7 +85,7 @@ export function connectedBuildings(buildings: Building[]) {
           [-1, 0],
           [0, 1],
           [0, -1],
-        ].some(([dx, dz]) => visited.has(key(b.x + dx, b.z + dz))),
+        ].some(([dx, dz]) => buildingCells(b).some(p=>visited.has(key(p.x + dx, p.z + dz)))),
     )
     .map((b) => b.id);
 }
@@ -131,4 +135,6 @@ export function computeProduction(
 export const upgradePrice = (b: Building) =>
   Math.round(defs[b.type].upgradeCost * Math.pow(1.65, b.level - 1));
 export const expansionPrice = (count: number) =>
-  Math.round(300 * Math.pow(1.16, Math.max(0, count - 9)));
+    Math.round(300 * Math.pow(1.16, Math.max(0, count - 9)));
+export const expansionTotal = (count: number, amount: number) =>
+  Array.from({ length: amount }, (_, i) => expansionPrice(count + i)).reduce((a, b) => a + b, 0);

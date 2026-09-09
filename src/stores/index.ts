@@ -48,11 +48,15 @@ export const useUIStore = create<{
   moving: string | null;
   rotation: number;
   hover: [number, number] | null;
-  expand: [number, number] | null;
+  expand: [number, number][] | null;
+  draggingBuilding: boolean;
   toast: string;
   collecting: boolean;
   cameraReset: number;
+  cameraFocus: {x:number;z:number;nonce:number}|null;
+  activeGuide:string|null;
   category:string;
+  mapMode: "none" | "happiness" | "commerce" | "roads" | "jobs" | "food" | "health" | "environment" | "value";
 }>(() => ({
   panel: null,
   tab: "",
@@ -62,10 +66,14 @@ export const useUIStore = create<{
   rotation: 0,
   hover: null,
   expand: null,
+  draggingBuilding: false,
   toast: "",
   collecting: false,
   cameraReset: 0,
+  cameraFocus:null,
+  activeGuide:null,
   category:'住宅',
+  mapMode:'none',
 }));
 export const useSettingsStore = create<{
   sound: boolean;

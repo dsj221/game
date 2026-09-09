@@ -16,10 +16,11 @@ import {
   canPlace,
   computeProduction,
   edgeTiles,
-  expansionPrice,
+  expansionTotal,
   upgradePrice,
 } from "../systems/economy";
 import { tone } from "../systems/audio";
+import {landRegions} from '../systems/land';
 import type { Panel, Resource, WorldId } from "../types";
 let toastTimer: ReturnType<typeof setTimeout>;
 export function tick() {
@@ -33,6 +34,7 @@ export function tick() {
       currency: R.getState().currency,
       tick: G.getState().ticks,
       weather: settings.weather,
+      tiles: W.getState().tiles,
     });
     const oldNotice = T.getState().notices[0]?.id;
     T.setState(result.town);
@@ -90,6 +92,34 @@ export function claimQuest(id: string) {
   T.setState({ claimed: [...t.claimed, id] });
   notify(`愿望已完成，获得 ${q.reward} 金币`);
   tone("collect");
+}
+export function promoteTown(){
+ const t=T.getState(),next=townLevels[t.level];
+ const m=metrics(B.getState().buildings,N.getState().npcs,R.getState().bag,t.facilities);
+ if(!next||m.population<next.population||m.happiness<(next.level>=3?70:45)||t.ledger.sales+t.reports.reduce((s,r)=>s+r.sales,0)<next.earned)return notify('晋级条件尚未全部满足');
+ T.setState({level:next.level,upgradeReady:false});
+ notify(`恭喜！小镇升至 Lv.${next.level} · ${next.name}`);tone('build');
+}
+export function goToQuest(id:string){
+ const q=quests.find(q=>q.id===id);if(!q)return;
+ U.setState({activeGuide:id,placement:null,moving:null});
+ const all=B.getState().buildings.filter(b=>b.world==='overworld');
+ if(W.getState().current!=='overworld')switchWorld('overworld');
+ const focus=(b:typeof all[number])=>{selectBuilding(b.id);U.setState({cameraFocus:{x:b.x,z:b.z,nonce:Date.now()}});};
+ if(q.action==='town'){panel('quests');return;}
+ if(q.action==='village'||q.type==='population'){panel('village');return;}
+ if(q.action==='happiness'||q.type==='environment'){U.setState({mapMode:q.action==='happiness'?'happiness':'environment'});const home=all.find(b=>defs[b.type].town?.capacity);if(home)focus(home);return;}
+ if(q.action==='upgrade-home'){const home=all.find(b=>defs[b.type].town?.capacity&&b.level<defs[b.type].maxLevel);if(home)focus(home);return;}
+ let type=q.action;
+ if(q.type==='chain')type=['farm','windmill','bakery','breadshop'].find(type=>!all.some(b=>b.type===type))||'bakery';
+ const existing=all.find(b=>b.type===type);
+ if(existing&&(q.type==='sales'||q.type==='produced'||q.type==='revenue'||q.type==='chain'&&['farm','windmill','bakery','breadshop'].every(type=>all.some(b=>b.type===type)))){focus(existing);return;}
+ beginBuild(type);
+ if(U.getState().placement!==type)return;
+ const candidates=W.getState().tiles.overworld.flatMap(t=>Array.from({length:9},(_,i)=>({x:t.x*3+i%3-1,z:t.z*3+Math.floor(i/3)-1}))).sort((a,b)=>(Math.abs(a.x)+Math.abs(a.z))-(Math.abs(b.x)+Math.abs(b.z)));
+ const site=candidates.find(p=>canPlace(p.x,p.z,W.getState().tiles.overworld,all,undefined,defs[type].size));
+ if(site)U.setState({hover:[site.x,site.z],cameraFocus:{...site,nonce:Date.now()}});
+ else notify('当前没有足够连续空地，请移动建筑或扩张土地。');
 }
 export function removeBuilding(id: string) {
   const b = B.getState().buildings.find((b) => b.id === id);
@@ -217,7 +247,7 @@ export function beginBuild(type: string) {
   notify("选择空地建造 · R 旋转 · Esc 取消");
 }
 export function cancelBuild() {
-  U.setState({ placement: null, moving: null, expand: null, hover: null });
+  U.setState({ placement: null, moving: null, expand: null, hover: null, draggingBuilding: false });
 }
 export function buildAt(x: number, z: number) {
   const ui = U.getState(),
@@ -229,10 +259,13 @@ export function buildAt(x: number, z: number) {
     if (
       edgeTiles(W.getState().tiles[world]).some(([a, b]) => a === x && b === z)
     )
-      U.setState({ expand: [x, z] });
+      U.setState({ expand: ui.expand?.some(([a,b]) => a === x && b === z)
+        ? ui.expand.filter(([a,b]) => a !== x || b !== z)
+        : [...(ui.expand ?? []), [x,z]] });
     return;
   }
-  if (!canPlace(x, z, W.getState().tiles[world], local, ui.moving || undefined))
+  const footprint = ui.moving ? (all.find(b=>b.id===ui.moving)?.footprint ?? [1,1] as [number,number]) : defs[ui.placement].size;
+  if (!canPlace(x, z, W.getState().tiles[world], local, ui.moving || undefined, footprint, ui.rotation))
     return notify("这里已有建筑，或超出了大陆边界");
   if (ui.moving) {
     B.setState({
@@ -263,6 +296,7 @@ export function buildAt(x: number, z: number) {
       {
         id: uid(),
         type: d.id,
+        footprint: [...d.size],
         world,
         x,
         z,
@@ -286,13 +320,15 @@ export function expand() {
   const world = W.getState().current,
     tiles = W.getState().tiles,
     position = U.getState().expand;
-  if (!position) return;
-  const cost = expansionPrice(tiles[world].length);
+  if (!position?.length) return;
+  const cost = expansionTotal(tiles[world].length, position.length);
+  if(world==='overworld')for(const [x,z] of position){const region=landRegions(tiles.overworld).find(r=>r.tiles.some(p=>p.x===x&&p.z===z));if(region&&(T.getState().level<region.level||T.getState().metrics.population<region.population))return notify(`${region.name}需要人口 ${region.population}，Lv.${region.level}`);}
+  if (world === "overworld" && T.getState().metrics.population < 6)
+    return notify("解锁南部林地需要人口达到 6");
   if (R.getState().currency < cost) return notify("金币不足");
   if (
-    !edgeTiles(tiles[world]).some(
-      ([x, z]) => x === position[0] && z === position[1],
-    )
+    new Set(position.map(p => p.join(','))).size !== position.length ||
+    !position.every(([a,b]) => edgeTiles(tiles[world]).some(([x,z]) => x === a && z === b))
   )
     return;
   R.setState((s) => ({ currency: s.currency - cost }));
@@ -301,19 +337,19 @@ export function expand() {
       ...tiles,
       [world]: [
         ...tiles[world],
-        { x: position[0], z: position[1], born: Date.now() },
+        ...position.map(([x,z]) => ({ x, z, born: Date.now() })),
       ],
     },
   });
   B.setState((s) => ({
     buildings: [
       ...s.buildings,
-      {
+      ...position.flatMap(([px,pz]) => [{
         id: uid(),
         type: "tree",
         world,
-        x: position[0] * 3 - 1,
-        z: position[1] * 3 - 1,
+        x: px * 3 - 1,
+        z: pz * 3 - 1,
         level: 1,
         rotation: 0,
         born: Date.now(),
@@ -322,18 +358,29 @@ export function expand() {
         id: uid(),
         type: "road",
         world,
-        x: position[0] * 3 + i - 1,
-        z: position[1] * 3,
+        x: px * 3 + i - 1,
+        z: pz * 3,
         level: 1,
         rotation: 0,
         born: Date.now(),
-      })),
+      }))]),
     ],
   }));
   cancelBuild();
   achieve("expand");
-  notify("新的土地，新的可能");
+  notify(`已扩建 ${position.length} 块土地，共花费 ${cost} 金币`);
   tone("build");
+}
+export function unlockRegion(id:string){
+ const w=W.getState(),t=T.getState(),r=R.getState();
+ if(w.current!=='overworld')return;
+ const region=landRegions(w.tiles.overworld).find(z=>z.id===id);
+ if(!region?.tiles.length)return;
+ if(t.metrics.population<region.population||t.level<region.level)return notify(`需要人口 ${region.population}，Lv.${region.level}`);
+ if(r.currency<region.cost)return notify('金币不足');
+ R.setState({currency:r.currency-region.cost});
+ W.setState({tiles:{...w.tiles,overworld:[...w.tiles.overworld,...region.tiles.map(p=>({...p,born:Date.now()}))]}});
+ notify(`${region.name}已解锁，新增 ${region.tiles.length*9} 格土地`);
 }
 export function upgrade(id: string) {
   const b = B.getState().buildings.find((b) => b.id === id);
@@ -350,6 +397,12 @@ export function upgrade(id: string) {
   achieve("upgrade");
   tone("build");
   notify(`${defs[b.type].name}升至 ${b.level + 1} 级`);
+}
+export function rotateBuilding(id:string){
+ const b=B.getState().buildings.find(x=>x.id===id);if(!b)return;
+ const rotation=(b.rotation+1)%4;
+ if(!canPlace(b.x,b.z,W.getState().tiles[b.world],B.getState().buildings.filter(x=>x.world===b.world),id,b.footprint||[1,1],rotation))return notify('旋转后的占地被占用');
+ B.setState(s=>({buildings:s.buildings.map(x=>x.id===id?{...x,rotation}:x)}));
 }
 export function collect() {
   if (S.getState().speed === 0) return;

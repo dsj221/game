@@ -52,6 +52,7 @@ import {
   switchWorld,
   trade,
   upgrade,
+  rotateBuilding,
   priceOf,
   unlocked,
 } from "../game/actions";
@@ -59,6 +60,7 @@ import { expansionPrice, upgradePrice } from "../systems/economy";
 import { format } from "../utils/format";
 import { Thumbnail } from "./Thumbnail";
 import { ModelPreview } from "./ModelPreview";
+import { getBuildingIcon } from "../data/buildingIcons";
 import { npcRuntime } from "../npcs/People";
 import type { BuildingDefinition, Resource } from "../types";
 const labels = {
@@ -107,11 +109,11 @@ function Card({
     <article className="facility">
       <div className="facility-top">
         <div className="thumb-wrap">
-          <Thumbnail type={d.modelType} />
+          <Thumbnail type={d.id} modelType={d.modelType} />
         </div>
         <div>
           <span className="eyebrow">
-            {d.category} {found.length > 0 && `· 已有 ${found.length}`}
+            {d.category} · 占地 {d.size[0]}×{d.size[1]} {found.length > 0 && `· 已有 ${found.length}`}
           </span>
           <h3>{d.name}</h3>
           <span className="subtle">
@@ -424,6 +426,7 @@ function Industry() {
   );
 }
 function Detail() {
+  const [modelFor, setModelFor] = useState<string | null>(null);
   const state = B(),
     world = W((s) => s.current),
     b = state.buildings.find((v) => v.id === state.selected);
@@ -432,15 +435,26 @@ function Detail() {
   return (
     <>
       <div className="detail-art">
-        <ModelPreview type={d.modelType} world={world} />
+        {getBuildingIcon(d.id) && modelFor !== b.id ? (
+          <Thumbnail type={d.id} modelType={d.modelType} size={512} />
+        ) : (
+          <ModelPreview type={d.modelType} world={world} />
+        )}
         <span>LV. {String(b.level).padStart(2, "0")}</span>
       </div>
+      {getBuildingIcon(d.id) && (
+        <button className="text-button" onClick={() => setModelFor(modelFor === b.id ? null : b.id)}>
+          {modelFor === b.id ? "查看建筑图标" : "查看 3D 模型"}
+        </button>
+      )}
       <span className="eyebrow">
-        {d.category} · {worlds[world].name}
+          {d.category} · {worlds[world].name} · 占地 {(b.footprint ?? [1, 1])[b.rotation % 2 ? 1 : 0]}×{(b.footprint ?? [1, 1])[b.rotation % 2 ? 0 : 1]}
       </span>
-      <h2>{d.name}</h2>
+        <h2>{d.name}</h2>
+        {!b.footprint && d.size.some(size => size > 1) && <p className="subtle">旧建筑保留原占地；新建同类建筑使用 {d.size[0]}×{d.size[1]} 占地。</p>}
       <p className="description">{d.description}</p>
       <FacilityInfo key={b.id} b={b} />
+      <button className="secondary wide" onClick={()=>rotateBuilding(b.id)}>旋转建筑 · {b.rotation*90}°</button>
       <button
         className="move-button"
         onClick={() =>

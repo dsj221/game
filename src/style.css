@@ -678,6 +678,16 @@ main {
   width: 100%;
   max-width: 220px;
 }
+.build-categories button kbd {
+  border: 1px solid #bdc9ae;
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+.thumb-wrap { flex-shrink: 0; }
+.building-icon { object-fit: contain; display: block; }
+.detail-art > .building-icon { margin: 0 auto; padding: 8px; }
 .facility h3 {
   font-size: 16px;
   margin: 4px 0 5px;
@@ -1696,3 +1706,16 @@ hr {
 @media(max-width:600px){.town-topbar{gap:12px;padding:0 12px}.town-topbar .brand-mark{display:none}.town-topbar .brand>span:last-child{font-size:18px;letter-spacing:2px}.hud-pill{gap:5px}.hud-pill svg{width:15px}.level-badge{display:none}.town-topbar .top-actions{gap:0}.town-topbar .icon-button{width:26px}.town-bottom{height:104px;flex-wrap:wrap;justify-content:center;position:relative;padding:4px 8px}.build-categories{order:0;justify-content:space-around;width:100%}.build-categories button{padding:7px 13px}.speed-controls{order:1;margin-right:auto}.town-management{order:2}.town-management button{height:27px}.town-news{top:58px;right:10px}.town-news button{font-size:9px;padding:7px}.town-news small{display:none}.town-goal{display:none}.world-title h1{font-size:20px}.town-management{gap:8px}}
 .canvas-wrap{isolation:isolate;z-index:0}
 .float-production{display:block;animation:floatUp 3s ease-out forwards}
+.world-loading {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  color: #728366;
+  background: #eef1e6;
+}
+.placement-info,.land-regions{display:flex;flex-direction:column;gap:6px;max-width:min(520px,65vw);font-size:11px;line-height:1.55;white-space:normal}.placement-info button,.land-regions button,.top-actions select{background:#edf0e3;color:#4c6548;border:1px solid #cdd8c0;border-radius:5px;padding:6px;font:inherit}.land-regions button:disabled{opacity:.5}.build-toolbar{max-height:55vh;overflow:auto}.top-actions select{max-width:90px;font-size:11px}
+.map-legend{position:absolute;right:24px;bottom:30px;background:#f5f4e8e8;padding:10px;font-size:11px;line-height:1.7;border-radius:5px;max-width:250px}.land-label{background:#f5f4e8db;color:#657257;font-size:10px;padding:6px;display:block;white-space:nowrap;border-radius:4px}
+.quest-chapters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:18px 0}.quest-chapters button{padding:9px 2px;border:0;border-radius:5px;background:#e7ecdc;font-size:12px}.quest-chapters button.active{background:#708b60;color:#fff}.quest-chapters small{display:block;font-size:9px;margin-top:5px}.quest-history{display:flex;align-items:center;gap:7px;font-size:11px;color:#7b886e}.quest-card>div{min-width:0}.quest-card.current{background:#e9eedc}.quest-hint{background:#e9eddf;padding:10px;border-radius:4px}.active-guide{font-size:11px;color:#6b7c60;max-width:440px;line-height:1.7;white-space:normal}.promotion-card{padding:16px;background:#e6edda;border-radius:7px;font-size:12px;line-height:1.8}.promotion-card small{display:block}.promotion-card button{display:block;margin-top:12px;padding:9px 16px}.promotion-backdrop{position:fixed;inset:0;background:#35463466;backdrop-filter:blur(4px);z-index:200;display:grid;place-items:center;padding:18px}.promotion-dialog{max-width:440px;width:100%;background:#f6f3e6;border-radius:12px;padding:25px;box-sizing:border-box;max-height:90vh;overflow:auto}.promotion-dialog h2{font-size:24px}.promotion-dialog>p{font-size:13px;line-height:1.8}.promotion-dialog>.text-button{margin-top:18px;font-size:11px}
+.town-goal .wishes-heading,.town-goal .wish-direct{display:flex;align-items:center;justify-content:space-between;width:100%;padding:8px 0;border:0;background:transparent;color:#4c6945;font:inherit;text-align:left}.town-goal .wishes-heading{font-weight:600;border-bottom:1px solid #cfdbc4}.town-goal .wish-direct{border-radius:4px;background:#e4ecd9;padding:8px;margin-top:4px}.town-management .wishes-entry{width:auto;min-width:86px;display:flex;align-items:center;gap:5px;font-size:11px;padding:0 5px;white-space:nowrap}

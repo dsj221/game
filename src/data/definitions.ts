@@ -1,5 +1,7 @@
 import type { BuildingDefinition, WorldDefinition, WorldId } from "../types";
 import {townConfig,townNames,townPrices} from './town.ts';
+import { buildingIconCatalog } from './buildingIcons.ts';
+import { plannedFootprint } from './footprints.ts';
 export const worlds: Record<WorldId, WorldDefinition> = {
   overworld: {
     id: "overworld",
@@ -153,6 +155,27 @@ export const definitions: BuildingDefinition[] = [
     description: "守望星海的古老石柱。",
   }),
 ];
+
+const iconCategory: Record<string, string> = {
+  storage: "生产", production: "生产", commercial: "商业", residential: "住宅",
+  public: "公共", agriculture: "生产", decoration: "装饰", infrastructure: "道路",
+  resource: "生产", special: "进阶",
+};
+const existingIconKeys = new Set(Object.values({
+  house: "thatched_cottage", shop: "market_stall", market: "market_pavilion",
+  mine: "mine_entrance", furnace: "blacksmith_forge", slime: "steam_machine",
+  drill: "wooden_crane", generator: "steam_machine", windmill: "windmill",
+  farm: "vegetable_garden", lumber: "log_pile", carpenter: "carpenter_workbench",
+  bakery: "wood_fired_oven", portal: "magic_portal", endportal: "magic_portal",
+  core: "crystal_obelisk", lamp: "lantern_post", torch: "lantern_post",
+  bridge: "arched_bridge", warehouse: "crate", park: "vine_pergola", flowerbed: "flower_planter",
+}));
+for (const icon of buildingIconCatalog) {
+  if (existingIconKeys.has(icon.key)) continue;
+  definitions.push(def(`icon_${icon.key}`, icon.name_cn, iconCategory[icon.category] ?? "装饰", "house", 180 + icon.id * 55, 0, {
+    description: `来自建筑图鉴的${icon.name_cn}，为小镇增添新的生活设施。`,
+  }));
+}
 for(const [id,modelType,description] of [
  ['residence','house','舒适的双层住宅，提供 4 个居住名额。'],['apartment','apartment','更紧凑的居住空间，给八位邻居一个家。'],
  ['bakery','bakery','面粉 ×2 → 面包 ×4。缺少面粉时暂停生产。'],['breadshop','shop','从仓库采购面包，邻居来消费时才产生营业额。'],
@@ -161,8 +184,9 @@ for(const [id,modelType,description] of [
  ['carpenter','lumber','木材 ×5 → 家具 ×2，为小镇集市提供商品。'],['cafe','shop','一份甜点，一段悠闲时光。消费满足娱乐需求。'],['school','house','邻里孩子的学堂，提高家庭幸福度。'],
 ])definitions.push(def(id,townNames[id], '村庄',modelType,townPrices[id],0,{description}));
 for(const d of definitions){d.town=townConfig[d.id];if(!d.town)continue;d.incomePerSecond=0;d.category=d.town.category;d.name=townNames[d.id]||d.name;d.cost=townPrices[d.id]??d.cost;d.upgradeCost=Math.round(d.cost*.8);if(d.town.capacity)d.population=d.town.capacity;if(['house','farm','lumber','windmill','shop'].includes(d.id)){d.materials=d.id==='house'?{wood:5}:undefined;d.description={house:'提供 2 个居住名额。有人入住后才产生租金；升级增加容量。',farm:'30 秒收获小麦 ×5、食物 ×3。员工不足会延长生产周期。',lumber:'20 秒生产木材 ×5，为住宅与家具制造提供原料。',windmill:'小麦 ×3 → 面粉 ×4，每个生产周期 18 秒。',shop:'采购食物，居民付款后获得营业额。无人消费时仍有工资和维护成本。'}[d.id]!;}if(d.id==='tree')d.production={};}
+for (const d of definitions) if (['park'].includes(d.id)) d.influenceRadius=3; else if (['shop','breadshop','market','cafe'].includes(d.id)) d.influenceRadius=4; else if (['house','residence','apartment'].includes(d.id)) d.influenceRadius=3;
 export const defs = Object.fromEntries(
-  definitions.map((d) => [d.id, d]),
+  definitions.map((d) => { d.size = plannedFootprint(d.id); if(d.town)d.maxLevel=3; return [d.id, d]; }),
 ) as Record<string, BuildingDefinition>;
 export const resourceNames = {
   wood: "木材",

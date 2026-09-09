@@ -20,8 +20,10 @@ export interface BuildingDefinition {
   population?: number;
   materials?: Partial<Bag>;
   town?: { category:'住宅'|'生产'|'商业'|'公共'|'道路'|'装饰'|'进阶'; jobs:number; wage:number; upkeep:number; unlock:number; cycle?:number; recipe?:Partial<Bag>; output?:Partial<Bag>; sells?:Resource; price?:number; wholesale?:number; happiness?:number; health?:number; environment?:number; rent?:number; capacity?:number };
+  influenceRadius?: number;
 }
 export interface Building {
+  footprint?: [number, number];
   id: string;
   type: string;
   world: WorldId;
@@ -60,6 +62,11 @@ export interface Npc {
   likes?:string[];
   recent?:string;
   lastPurchase?:number;
+  position?:{x:number;z:number};
+  travelTarget?:string;
+  route?:{x:number;z:number}[];
+  arrivedAt?:string;
+  travelProgress?:number;
 }
 export interface WorldDefinition {
   id: WorldId;

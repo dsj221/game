@@ -51,8 +51,14 @@ import {
   studioAction,
   switchWorld,
 } from "./game/actions";
-import { worlds } from "./data/definitions";
-import { expansionPrice } from "./systems/economy";
+import { worlds, defs } from "./data/definitions";
+import { influenceFor } from "./systems/buildingInfluence";
+import { PlacementInfo } from './components/PlacementInfo';
+import {PlacementBar} from './components/PlacementBar';
+import { LandRegions } from './components/LandRegions';
+import {TownPromotion} from './components/TownPromotion';
+import {quests} from './data/town';
+import { expansionPrice, expansionTotal } from "./systems/economy";
 import { save, exportSave } from "./systems/persistence";
 import { format } from "./utils/format";
 import type { WorldId } from "./types";
@@ -251,25 +257,29 @@ export default function App() {
               <span className="collect-hint">一锤一镐，也是一种生活。</span>
             </div>
           )}
-          {ui.placement && (
+          {ui.placement&&ui.placement!=='expand'&&<PlacementBar key={`${ui.placement}:${ui.moving||'new'}`}/>}
+          {ui.placement==='expand' && (
             <div className="build-toolbar">
               <div>
+                <LandRegions />
                 <b>
                   {ui.placement === "expand"
-                    ? "选择黄色边缘地块"
+                    ? "选择多块黄色边缘地块 · 再次点击取消选中"
                     : ui.moving
                       ? "给建筑找一个新位置"
                       : "点击空地，安放新的可能"}
                 </b>
                 <small>
                   {ui.placement === "expand"
-                    ? `开垦费用 ${format(expansionPrice(w.tiles[w.current].length))} 金币`
+                    ? ui.expand?.length ? `已选 ${ui.expand.length} 块 · 合计 ${format(expansionTotal(w.tiles[w.current].length, ui.expand.length))} 金币` : `南部林地 · 人口 ≥ 6 · 首块 ${format(expansionPrice(w.tiles[w.current].length))} 金币`
                     : `R 旋转 · 方向 ${ui.rotation * 90}° · Esc 取消`}
                 </small>
+                <PlacementInfo />
+                {ui.activeGuide&&<p className="active-guide">{quests.find(q=>q.id===ui.activeGuide)?.hint}</p>}
               </div>
-              {ui.expand && (
-                <button className="primary" onClick={expand}>
-                  确认建造
+              {!!ui.expand?.length && (
+                <button className="primary" onClick={expand} disabled={r.currency < expansionTotal(w.tiles[w.current].length, ui.expand.length)}>
+                  确认扩建 {ui.expand.length} 块
                 </button>
               )}
               <button aria-label="取消建造" onClick={cancelBuild}>
@@ -277,17 +287,19 @@ export default function App() {
               </button>
             </div>
           )}
+          {ui.mapMode!=='none'&&!ui.placement&&<div className="map-legend">绿色：良好 · 黄色：一般 · 红色：不足<br/>幸福度仅显示已入住住宅；点击住宅查看原因。土地价值为服务覆盖指数。</div>}
         </section>
         <Drawer />
       </main>
       <BuildMenu />
       {ui.toast && (
-        <div className="toast" role="status">
+        <div className={`toast ${ui.placement?'placement-toast':''}`} role="status">
           <Check size={16} />
           {ui.toast}
         </div>
       )}
       <Settings />
+      <TownPromotion />
     </div>
   );
 }

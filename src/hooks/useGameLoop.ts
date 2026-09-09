@@ -1,14 +1,9 @@
 import { useEffect } from "react";
 import { tick, cancelBuild, collect, panel } from "../game/actions";
-import { load, save } from "../systems/persistence";
+import { save } from "../systems/persistence";
 import { useUIStore as U, useWorldStore as W } from "../stores";
-let loaded = false;
 export function useGameLoop() {
   useEffect(() => {
-    if (!loaded) {
-      loaded = true;
-      load();
-    }
     const interval = setInterval(tick, 1000),
       autosave = setInterval(() => save(true), 10000);
     const down = (e: KeyboardEvent) => {

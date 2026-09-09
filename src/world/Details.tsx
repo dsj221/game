@@ -1,30 +1,35 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { Box } from "../buildings/Model";
 import { useSettingsStore } from "../stores";
-export function Scenery({ world }: { world: string }) {
-  const s = useSettingsStore();
-  const pond = useRef<THREE.Mesh>(null!);
-  useFrame(({ clock }) => {
-    if (pond.current)
-      pond.current.position.y =
-        0.06 + Math.sin(clock.elapsedTime * s.speed) * 0.012;
+import type { Building, Tile } from "../types";
+import { sceneryLayout, sceneryNoise as noise } from "./sceneryLayout";
+import { IconBuilding } from "../buildings/IconBuilding";
+
+
+export function Scenery({ world, tiles, buildings }: { world: string; tiles: Tile[]; buildings: Building[] }) {
+  const speed = useSettingsStore(s => s.speed);
+  const night = useSettingsStore(s=>s.hour<6 || s.hour>19 || s.weather.includes("dusk"));
+  const water = useRef<THREE.Group>(null!);
+  const waterTime = useRef(0);
+  useFrame((_, dt) => {
+    waterTime.current += dt * speed;
+    if (water.current) water.current.position.y = Math.sin(waterTime.current * .45) * .008;
   });
-  const points = useMemo(
-    () =>
-      Array.from(
-        { length: 34 },
-        (_, i) =>
-          [(i % 17) * 0.72 - 6, 0.13, i < 17 ? -6.55 : 3.8] as [
-            number,
-            number,
-            number,
-          ],
-      ),
-    [],
-  );
-  return world === "overworld" ? <group>{[-3.8,-2.8,-1.8,1.8,2.8,3.8].map((x,i)=><group key={x}><Box p={[x,0.13,4.3]} s={[0.07,0.26,0.07]} c="#819365"/><Box p={[x,0.29,4.3]} s={[0.13,0.09,0.13]} c={i%2?"#cfac83":"#b9bf85"}/></group>)}</group> : null;
+  const scenery = useMemo(() => {
+    return sceneryLayout(tiles, buildings);
+  }, [tiles, buildings]);
+  if (world !== "overworld") return null;
+  return <group>
+    <group ref={water}>
+      {scenery.lakes.map(({x,z})=><group key={`lake-${x}-${z}`} position={[x,.055,z]}>
+        <IconBuilding type="scenery_lake" night={night} fallback={null} />
+      </group>)}
+    </group>
+    {scenery.grass.map(({x,z})=>{return <group key={`grass-${x}-${z}`} position={[x+(noise(x,z,41)-.5)*.4,.08,z+(noise(x,z,43)-.5)*.4]} rotation={[0,noise(x,z,29)*Math.PI,0]}>
+      <IconBuilding type="scenery_grass" night={night} fallback={null} />
+    </group>;})}
+  </group>;
 }
 
 export function Smoke({

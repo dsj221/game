@@ -1,124 +1,48 @@
-import { useEffect,useMemo, useRef } from "react";
+import { useEffect,useMemo,useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { Box } from "../buildings/Model";
 import type { Npc, Building } from "../types";
-import { useNpcStore, useUIStore } from "../stores";
-import { roadType } from "../systems/economy";
-import { roadPath } from "./path";
-export function Person({
-  npc,
-  buildings,
-  speed,
-}: {
-  npc: Npc;
-  buildings: Building[];
-  speed: number;
-}) {
-  const ref = useRef<THREE.Group>(null!);
-  const roads = useMemo(
-    () => buildings.filter((b) => roadType(b.type)),
-    [buildings],
-  );
-  const state = useRef({
-    index: Math.floor(npc.phase) % Math.max(1, roads.length),
-    path: [] as number[],
-    pause: 0,
-    elapsed: 0,
-    started: false,
-    returning: false,
-  });
-  useEffect(()=>{state.current.path=[];state.current.pause=0},[npc.destination,roads]);
-  useFrame((_, dt) => {
-    if (!ref.current || !roads.length) return;
-    const s = state.current;
-    s.index %= roads.length;
-    if (!s.started) {
-      ref.current.position.set(roads[s.index].x, 0, roads[s.index].z);
-      s.started = true;
-    }
-    s.elapsed += dt * speed;
-    const p = ref.current.position;
-    if (s.pause > 0) {
-      s.pause -= dt * speed;
-      npcRuntime.set(npc.id, {
-        status: npc.state||'整理货物',
-        x: p.x,
-        z: p.z,
-      });
-      return;
-    }
-    if (!s.path.length) {
-      const work = buildings.find((b) => b.id === npc.workplace);
-      const home = buildings.find((b) => b.id === npc.home) || work;
-      const destination = buildings.find(b=>b.id===npc.destination)||home||work;
-      let goal = s.index;
-      if (destination) {
-        let distance = Infinity;
-        roads.forEach((r, i) => {
-          const d =
-            Math.abs(r.x - destination.x) + Math.abs(r.z - destination.z);
-          if (d < distance) {
-            distance = d;
-            goal = i;
-          }
-        });
-      }
-      s.path = roadPath(roads, s.index, goal);
-      if (!s.path.length) {
-        if(goal===s.index&&npc.state&&!npc.state.includes('散步')){s.pause=.5;npcRuntime.set(npc.id,{status:npc.state,x:p.x,z:p.z});return;}
-        const neighbor = roads
-          .map((r, i) => ({ r, i }))
-          .filter(
-            ({ r }) =>
-              Math.abs(r.x - roads[s.index].x) +
-                Math.abs(r.z - roads[s.index].z) ===
-              1,
-          );
-        if (neighbor.length)
-          s.path = [neighbor[Math.floor(Math.random() * neighbor.length)].i];
-        else {
-          npcRuntime.set(npc.id, { status: "等待道路连接", x: p.x, z: p.z });
-          return;
-        }
-      }
-    }
-    const target = roads[s.path[0] % roads.length],
-      dx = target.x - p.x,
-      dz = target.z - p.z,
-      dist = Math.hypot(dx, dz);
-    if (dist < 0.025) {
-      s.index = s.path.shift()!;
-      if (!s.path.length) {
-        s.pause = 2 + (npc.phase % 2);
-        s.returning = !s.returning;
-      }
-    } else {
-      const delta = Math.min(dist, dt * speed * 0.7 * npc.efficiency);
-      p.x += (dx / dist) * delta;
-      p.z += (dz / dist) * delta;
-      ref.current.rotation.y = Math.atan2(dx, dz);
-      p.y = Math.sin(s.elapsed * 9) * 0.018;
-    }
-    npcRuntime.set(npc.id, {
-      status: npc.state||'前往目的地',
-      x: p.x,
-      z: p.z,
-    });
-  });
-  return (
-    <group
-      ref={ref}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (useUIStore.getState().placement) return;
-        useNpcStore.setState({ selected: npc.id });
-        useUIStore.setState({ panel: "npc", tab: "" });
-      }}
-    >
-      <PersonModel kind={npc.modelType} variant={Math.floor(npc.phase)} />
-    </group>
-  );
+import { useNpcStore,useUIStore,useWorldStore } from "../stores";
+import {navigationGrid,entrances,findRoute,type Point} from "./navigation";
+export function Person({npc,buildings,speed}:{npc:Npc;buildings:Building[];speed:number}) {
+ const ref=useRef<THREE.Group>(null!);
+ const tiles=useWorldStore(s=>s.tiles[npc.world]);
+ const grid=useMemo(()=>navigationGrid(tiles,buildings),[tiles,buildings]);
+ const path=useRef<Point[]|null>(null);
+ useEffect(()=>{
+  if(npc.position){ref.current.position.set(npc.position.x,0,npc.position.z);return;}
+  const home=buildings.find(b=>b.id===npc.home);
+  const destination=buildings.find(b=>b.id===npc.destination)||home;
+  if(!destination)return;
+  const saved=npcRuntime.get(npc.id);
+  const first=saved?{x:Math.round(saved.x),z:Math.round(saved.z)}:home?entrances(home,grid)[0]:entrances(destination,grid)[0];
+  if(!first||!grid.has(`${first.x},${first.z}`)){path.current=null;return;}
+  ref.current.position.set(first.x,0,first.z);
+  path.current=findRoute(first,entrances(destination,grid),grid);
+ },[npc.destination,npc.home,grid,buildings]);
+ useEffect(()=>()=>{npcRuntime.delete(npc.id)},[npc.id]);
+ useFrame((_,dt)=>{
+  if(!ref.current)return;
+  if(npc.position){
+    const p=ref.current.position,dx=npc.position.x-p.x,dz=npc.position.z-p.z,d=Math.hypot(dx,dz);
+    const movement=Math.min(d,dt*speed*2);
+    if(d>.01&&movement){p.x+=dx/d*movement;p.z+=dz/d*movement;ref.current.rotation.y=Math.atan2(dx,dz);}
+    ref.current.visible=d>.03||!npc.arrivedAt;
+    npcRuntime.set(npc.id,{x:p.x,z:p.z,status:npc.arrivedAt?npc.state||'已到达':'正在前往目的地'});return;
+  }
+  const p=ref.current.position,target=path.current?.[0];
+  ref.current.visible=path.current===null||!!target;
+  if(target&&speed>0){
+   const dx=target.x-p.x,dz=target.z-p.z,distance=Math.hypot(dx,dz);
+   const weight=grid.get(`${target.x},${target.z}`)||2.5;
+   const move=Math.min(distance,dt*speed*2/weight);
+   if(distance<.02)path.current!.shift();
+   else {p.x+=dx/distance*move;p.z+=dz/distance*move;ref.current.rotation.y=Math.atan2(dx,dz);}
+  }
+  npcRuntime.set(npc.id,{status:path.current===null?"道路受阻":target?"正在前往目的地":npc.state||"已到达",x:p.x,z:p.z});
+ });
+ return <group ref={ref} onClick={e=>{e.stopPropagation();if(useUIStore.getState().placement)return;useNpcStore.setState({selected:npc.id});useUIStore.setState({panel:"npc",tab:""});}}><PersonModel kind={npc.modelType} variant={Math.floor(npc.phase)}/></group>;
 }
 export const npcRuntime = new Map<
   string,

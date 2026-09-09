@@ -1,4 +1,16 @@
-export function Thumbnail({ type }: { type: string }) {
+import { useState } from "react";
+import { getBuildingIcon } from "../data/buildingIcons";
+
+export function Thumbnail({ type, modelType = type, size = 256 }: { type: string; modelType?: string; size?: 256 | 512 }) {
+  const src = getBuildingIcon(type, size);
+  const [failedSrc, setFailedSrc] = useState<string>();
+  if (src && failedSrc !== src) {
+    return <img className="thumbnail building-icon" src={src} width={size} height={size} alt="" aria-hidden="true" decoding="async" draggable={false} onError={() => setFailedSrc(src)} />;
+  }
+  return <FallbackThumbnail type={modelType} />;
+}
+
+function FallbackThumbnail({ type }: { type: string }) {
   const mechanical = [
     "drill",
     "furnace",

@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
 import { BuildingModel } from "./Model";
+import { IconBuilding } from "./IconBuilding";
+import { defs } from "../data/definitions";
 import type { WorldId } from "../types";
 export function Ghost({
   type,
@@ -13,6 +15,10 @@ export function Ghost({
   valid: boolean;
   rotation: number;
 }) {
+  return <IconBuilding type={type} rotation={rotation} ghost={valid} fallback={<ModelGhost type={defs[type]?.modelType ?? type} world={world} valid={valid} rotation={rotation} />} />;
+}
+
+function ModelGhost({ type, world, valid, rotation }: { type: string; world: WorldId; valid: boolean; rotation: number }) {
   const ref = useRef<THREE.Group>(null!);
   useLayoutEffect(() => {
     const clones: THREE.Material[] = [];

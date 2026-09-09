@@ -28,6 +28,7 @@ import { quests, townLevels, emptyFacility } from "../data/town";
 import { questProgress, capacity, slots } from "../game/TownSimulation";
 import {
   beginBuild,
+  goToQuest,
   claimQuest,
   panel,
   removeBuilding,
@@ -39,6 +40,7 @@ import {
   priceOf,
 } from "../game/actions";
 import { format } from "../utils/format";
+import {TownProgress} from './TownPromotion';
 import type { Building, Npc, Resource } from "../types";
 export const coreResources: Resource[] = [
   "wood",
@@ -254,6 +256,7 @@ export function CitizenInfo({ n }: { n: Npc }) {
         </div>
       </div>
       <blockquote>“{n.recent || "很高兴来到这里。"}”</blockquote>
+      <div className="production-lines">{Object.entries(happinessFactors(n,buildings,defs)).map(([name,value])=><span key={name}>{name}<b>{value>=0?'+':''}{value.toFixed(1)}</b></span>)}</div>
       <div className="town-stat-grid">
         <div>
           <b>{Math.round(n.happiness || 0)}%</b>
@@ -310,6 +313,7 @@ export function CitizenInfo({ n }: { n: Npc }) {
   );
 }
 export function FacilityInfo({ b }: { b: Building }) {
+  const allBuildings=B(s=>s.buildings);
   const t = T(),
     n = N((s) => s.npcs),
     resources = R(),
@@ -334,6 +338,7 @@ export function FacilityInfo({ b }: { b: Building }) {
       </div>
       {c.capacity ? (
         <>
+          <div className="production-lines">{residents[0]&&Object.entries(happinessFactors(residents[0],allBuildings,defs)).map(([name,value])=><span key={name}>{name}<b>{value>=0?'+':''}{value.toFixed(1)}</b></span>)}</div>
           <div className="town-stat-grid">
             <div>
               <b>
@@ -515,58 +520,27 @@ export function FacilityInfo({ b }: { b: Building }) {
   );
 }
 export function QuestPanel() {
-  const t = T(),
-    buildings = B((s) => s.buildings);
-  return (
-    <>
-      <div className="panel-intro">
-        <span className="eyebrow">SMALL WISHES, BIG LITTLE CHANGES</span>
-        <h2>小镇的好日子，一起建。</h2>
-        <p>每一个愿望，都是邻居对这里的期待。</p>
-      </div>
-      {quests.map((q) => {
-        const progress = Math.min(q.count, questProgress(t, buildings, q.id)),
-          ready = t.completed.includes(q.id),
-          claimed = t.claimed.includes(q.id);
-        return (
-          <article
-            className={`quest-card ${claimed ? "claimed" : ""}`}
-            key={q.id}
-          >
-            <span className="quest-icon">
-              {claimed ? (
-                <Check size={20} />
-              ) : q.id.startsWith("wish") ? (
-                <Heart size={20} />
-              ) : (
-                <Leaf size={20} />
-              )}
-            </span>
-            <div>
-              <h3>{q.title}</h3>
-              <p>{q.text}</p>
-              <div className="quest-progress">
-                <i style={{ width: `${(progress / q.count) * 100}%` }} />
-              </div>
-              <small>
-                {progress.toFixed(0)} / {q.count} · 奖励 {q.reward} 金币
-              </small>
-              <button
-                disabled={claimed}
-                className={ready && !claimed ? "primary" : "text-button"}
-                onClick={() =>
-                  ready ? claimQuest(q.id) : beginBuild(q.action)
-                }
-              >
-                {claimed ? "心愿已经实现" : ready ? "领取奖励" : "去建设"}{" "}
-                {!claimed && <ArrowRight size={13} />}
-              </button>
-            </div>
-          </article>
-        );
-      })}
-    </>
-  );
+ const t=T(),buildings=B(s=>s.buildings),[chapter,setChapter]=useState(0),[showDone,setShowDone]=useState(true);
+ const active=U(s=>s.activeGuide);
+ const chapterQuests=quests.filter(q=>chapter===0||q.stage===chapter);
+ const visible=chapterQuests.filter(q=>showDone||!t.claimed.includes(q.id));
+ return <>
+  <div className="panel-intro"><span className="eyebrow">GROW TOGETHER</span><h2>一步一步，住进理想生活。</h2><p>从第一间住宅到梦想之城。先完成当前阶段，建设、生产与居民生活会逐渐展开。</p></div>
+  <TownProgress />
+  <button className="text-button" onClick={()=>setChapter(0)}>全部邻里愿望（{quests.length}）</button>
+  <div className="quest-chapters">{townLevels.map(l=><button key={l.level} className={chapter===l.level?'active':''} onClick={()=>setChapter(l.level)}>Lv.{l.level}<small>{l.name}</small></button>)}</div>
+  <p className="note">{chapter>t.level?'这是未来的愿望。晋级后解锁这一章的行动。':'建议从第一项未完成愿望开始。点击按钮直接进入操作或定位建筑，无需翻找菜单。'}</p>
+  <label className="quest-history"><input type="checkbox" checked={showDone} onChange={e=>setShowDone(e.target.checked)}/>显示已领取愿望（{chapterQuests.filter(q=>t.claimed.includes(q.id)).length}）</label>
+  {!visible.length&&<p>这一章的心愿都已实现。继续满足上方小镇晋级条件吧。</p>}
+  {visible.map(q=>{const progress=Math.min(q.count,questProgress(t,buildings,q.id)),ready=t.completed.includes(q.id),claimed=t.claimed.includes(q.id);return <article key={q.id} className={`quest-card ${active===q.id?'current':''} ${claimed?'claimed':''}`}>
+   <span className="quest-icon">{ready?<Check size={20}/>:<Heart size={20}/>}</span>
+   <div><h3>{q.title}</h3><p>{q.text}</p><p className="quest-hint">{q.hint}</p>
+    <div className="quest-progress"><i style={{width:`${progress/q.count*100}%`}}/></div>
+    <small>{Math.floor(progress)} / {q.count} · 奖励 {q.reward} 金币</small>
+    <button disabled={claimed||q.stage>t.level} className={ready?'primary':'text-button'} onClick={()=>ready?claimQuest(q.id):goToQuest(q.id)}>{claimed?'心愿已实现':q.stage>t.level?`Lv.${q.stage}解锁`:ready?'领取奖励':'前往完成'} <ArrowRight size={13}/></button>
+   </div>
+  </article>})}
+ </>;
 }
 export function DailySummary() {
   const t = T(),
@@ -717,3 +691,4 @@ export function ProductionPanel() {
     </>
   );
 }
+import {happinessFactors} from '../systems/buildingInfluence';

@@ -16,8 +16,10 @@ import {
 } from "../data/town.ts";
 import { makeCitizen } from "../data/settlement.ts";
 import { connectedBuildings } from "../systems/economy.ts";
-import { influenceFor, happinessFactors, buildingDistance, influenceRules } from "../systems/buildingInfluence.ts";
+import { influenceFor, happinessFactors, buildingDistance, influenceRules, operationalIds } from "../systems/buildingInfluence.ts";
 import {advanceTravel} from '../npcs/travel.ts';
+import {onShift} from '../systems/workSchedule.ts';
+import {developmentBonuses} from '../systems/development.ts';
 const clamp = (n: number, min = 0, max = 100) =>
   Math.max(min, Math.min(max, n));
 const cfg = (b: Building) => defs[b.type]?.town;
@@ -94,7 +96,7 @@ export function metrics(
     ).length;
   const environment = clamp(
     48 +
-      local.reduce((n, b) => n + (cfg(b)?.environment || 0) * b.level, 0) -
+      local.reduce((n, b) => n + (b.paused ? 0 : (cfg(b)?.environment || 0) * b.level), 0) -
       local.filter((b) => ["furnace", "drill"].includes(b.type)).length * 3,
   );
   const happiness = pop
@@ -270,6 +272,7 @@ export function simulateTown(input: SimInput): SimOutput {
   let currency = input.currency;
   const before = currency;
   const tick = input.tick + 1;
+  const bonuses=developmentBonuses(t.development);
   const localBuildings = Object.fromEntries(['overworld','nether','end'].map(world=>[world,buildings.filter(b=>b.world===world)]));
   const pulse = (b: Building, text: string) => {
     t.pulses = [
@@ -307,18 +310,13 @@ export function simulateTown(input: SimInput): SimOutput {
   }
   eventStep(t, tick);
   assignHomesAndJobs(buildings, npcs);
-  const working = isWorkTime(t.minute),
-    open = t.minute >= 480 && t.minute < 1320;
   const rain =
       t.events.some((e) => e.type === "rain") || input.weather.includes("rain"),
     festival = t.events.some((e) => e.type === "festival"),
     flu = t.events.some((e) => e.type === "flu");
-  const staffedClinics = buildings.filter(
-    (b) =>
-      b.type === "clinic" &&
-      !b.paused &&
-      npcs.some((n) => n.workplace === b.id),
-  ).length;
+  const offline = new Set(input.offline || []);
+  const activeIds = operationalIds(buildings,npcs,defs,input.offline,!!input.tiles);
+  for(const b of buildings)if(cfg(b)?.jobs&&!onShift(t.minute,t.facilities[b.id],!!cfg(b)?.sells))activeIds.delete(b.id);
   const connections = new Set<string>();
   for (const world of ["overworld", "nether", "end"])
     connectedBuildings(buildings.filter((b) => b.world === world)).forEach(
@@ -331,6 +329,7 @@ export function simulateTown(input: SimInput): SimOutput {
     const c = cfg(b);
     if (!c) continue;
     const f = (t.facilities[b.id] ??= emptyFacility());
+    const shift=onShift(t.minute,f,!!c.sells);
     const staff = npcs.filter(
       (n) => n.workplace === b.id && n.modelType === "villager",
     );
@@ -341,26 +340,33 @@ export function simulateTown(input: SimInput): SimOutput {
       (connections.has(b.id) || ["住宅", "公共", "装饰"].includes(c.category)
         ? 1
         : 0.5) *
-      influenceFor(b, buildings, defs).efficiency *
-      (flu && !staffedClinics ? 0.8 : 1);
+      influenceFor(b, buildings, defs, activeIds).efficiency *
+      (flu && !influenceFor(b, buildings, defs, activeIds).health ? 0.8 : 1) *
+      (c.output ? bonuses.production*(c.recipe?bonuses.processing:1) : 1);
     if (b.paused) {
+      f.efficiency = 0;
       f.status = "暂停营业";
       continue;
     }
-    const upkeep = (c.upkeep * b.level) / 360;
+    const upkeep = (c.upkeep * b.level) / 360 * bonuses.maintenance;
     currency -= upkeep;
     f.costs += upkeep;
     f.dailyCosts += upkeep;
     t.ledger.maintenance += upkeep;
-    if (working) {
+    if (shift) {
       for (const n of staff) {
-        const wage = (n.income || 0) / 135;
+        const wage = (n.income || 0) / 135 * bonuses.wages;
         currency -= wage;
         n.wallet = (n.wallet ?? 70) + wage;
         t.ledger.wages += wage;
         f.costs += wage;
         f.dailyCosts += wage;
       }
+    }
+    if (offline.has(b.id)) {
+      f.status = '缺少电力';
+      f.efficiency = 0;
+      continue;
     }
     if (c.capacity) {
       f.status = "住宅";
@@ -376,12 +382,16 @@ export function simulateTown(input: SimInput): SimOutput {
       continue;
     }
     if (c.sells) {
-      if (!open) {
+      if (!shift) {
         f.status = "休息中";
         continue;
       }
       if (!staff.length) {
         f.status = "员工不足";
+        continue;
+      }
+      if (!activeIds.has(b.id)) {
+        f.status = "员工未到岗";
         continue;
       }
       const want = Math.min(
@@ -403,10 +413,11 @@ export function simulateTown(input: SimInput): SimOutput {
       continue;
     }
     if (!c.output) {
-      f.status = "开放中";
+      if(c.jobs&&!shift){f.status='休息中';f.efficiency=0;continue;}
+      f.status = c.jobs && !activeIds.has(b.id) ? "员工不足" : "开放中";
       continue;
     }
-    if (!working) {
+    if (!shift) {
       f.status = "休息中";
       continue;
     }
@@ -424,10 +435,12 @@ export function simulateTown(input: SimInput): SimOutput {
     f.progress += f.efficiency / (c.cycle || 30);
     if (f.progress >= 1) {
       f.progress -= 1;
-      for (const [r, n] of Object.entries(c.recipe || {}))
+      for (const [r, n] of Object.entries(c.recipe || {})) {
         bag[r as Resource] -= n;
+        addResource(t.ledger.consumed, r as Resource, n);
+      }
       for (const [r, n] of Object.entries(c.output)) {
-        const quantity = n * b.level * (b.type === "farm" && rain ? 0.8 : 1);
+        const quantity = n * b.level * (b.type === "farm" && rain ? 0.8 : 1) * (['food','wheat'].includes(r)?bonuses.food:1);
         bag[r as Resource] += quantity;
         addResource(t.ledger.produced, r as Resource, quantity);
         f.produced += quantity;
@@ -438,13 +451,8 @@ export function simulateTown(input: SimInput): SimOutput {
       }
     }
   }
-  const shops = buildings.filter((b) => cfg(b)?.sells && !b.paused),
-    parks = buildings.filter((b) => b.type === "park" && !b.paused);
-  const environment = metrics(buildings, npcs, bag, t.facilities).environment;
-  const publicHappy = buildings.reduce(
-    (sum, b) => sum + (b.paused ? 0 : cfg(b)?.happiness || 0),
-    0,
-  );
+  const shops = buildings.filter((b) => cfg(b)?.sells && activeIds.has(b.id)),
+    parks = buildings.filter((b) => influenceRules[b.type]?.leisure && activeIds.has(b.id));
   for (const [index, n] of npcs.entries()) {
     if (n.modelType !== "villager") continue;
     n.wallet = (n.wallet || 0) + 24 / 360; // Household remittances keep purchasing power circulating.
@@ -452,15 +460,19 @@ export function simulateTown(input: SimInput): SimOutput {
     n.needs.food = clamp(n.needs.food + 0.28);
     n.needs.fun = clamp(n.needs.fun + (n.age! < 30 ? 0.15 : 0.1));
     n.needs.shopping = clamp(n.needs.shopping + 0.08);
+    const residence=buildings.find(b=>b.id===n.home);
+    const hasClinic = !!residence && influenceFor(residence,buildings,defs,activeIds).health;
+    const localParks = parks.filter(b=>b.world===n.world && (!residence || buildingDistance(residence,b)<=(influenceRules[b.type]?.radius||3)));
     n.health = clamp(
       (n.health ?? 90) +
-        (staffedClinics ? 0.035 : 0) -
-        (flu && !staffedClinics ? 0.11 : 0) -
+        (hasClinic ? 0.035 : 0) -
+        (flu && !hasClinic ? 0.11 : 0) -
         (n.needs.food > 80 ? 0.05 : 0),
     );
     const foodNeed = n.needs.food > 32,
       funNeed = n.needs.fun > 40, shoppingNeed = n.needs.shopping > 35;
-    const residence=buildings.find(b=>b.id===n.home);
+    const workplace = buildings.find(b=>b.id===n.workplace);
+    const shopShift = !!workplace && onShift(t.minute,t.facilities[workplace.id],!!cfg(workplace)?.sells);
     const shop = shops
       .filter(
         (b) =>
@@ -468,23 +480,27 @@ export function simulateTown(input: SimInput): SimOutput {
           (!residence||buildingDistance(residence,b)<=(influenceRules[b.type]?.radius||5)) &&
           t.facilities[b.id]?.staff > 0 &&
           t.facilities[b.id].stock >= 1 &&
-          (festival || (foodNeed && ["food","bread"].includes(cfg(b)?.sells || "")) || (funNeed && b.type === "cafe") || (shoppingNeed && cfg(b)?.sells === "furniture")),
+          t.facilities[b.id].priceFactor <= 1.5 &&
+          (festival || (foodNeed && ["food","bread"].includes(cfg(b)?.sells || "")) || (funNeed && ['cafe','tea_house'].includes(b.type)) || (shoppingNeed && cfg(b)?.sells === "furniture")),
       )
       .sort((a, b) => {
+        if(a.id===n.travelTarget)return -1;
+        if(b.id===n.travelTarget)return 1;
         const pref = (v: Building) =>
           cfg(v)?.sells === "food" || cfg(v)?.sells === "bread" ? 0 : 1;
         return foodNeed ? pref(a) - pref(b) + ((index + Math.floor(tick / 19)) % 2 ? (cfg(a)?.sells === "bread" ? -0.1 : 0) - (cfg(b)?.sells === "bread" ? -0.1 : 0) : 0) : 0;
       })[0];
     let bought = false;
     if(input.tiles){
-      const leisure=t.minute>=1080&&t.minute<1260?parks.find(b=>b.world===n.world):undefined;
-      const destination=(open&&shop&&(foodNeed||funNeed||shoppingNeed))?shop:working?buildings.find(b=>b.id===n.workplace):leisure||residence;
+      const leisure=t.minute>=1080&&t.minute<1260?localParks[0]:undefined;
+      // Keep shop staff at the counter throughout opening hours.
+      const destination=shopShift&&cfg(workplace!)?.sells?workplace:(shop&&(foodNeed||funNeed||shoppingNeed||festival))?shop:shopShift?workplace:leisure||residence;
       n.destination=destination?.id;
       advanceTravel(n,destination,localBuildings[n.world],input.tiles[n.world]);
     }
     if (
-      open &&
       shop &&
+      t.facilities[shop.id].stock >= 1 &&
       (!input.tiles||n.arrivedAt===shop.id) &&
       (foodNeed || funNeed || shoppingNeed || festival) &&
       tick - (n.lastPurchase ?? -100) > 18 &&
@@ -520,7 +536,7 @@ export function simulateTown(input: SimInput): SimOutput {
         if (c.sells === "food" || c.sells === "bread")
           n.needs.food = clamp(n.needs.food - 55);
         n.needs.shopping = clamp(n.needs.shopping - 35);
-        if (shop.type === "cafe" || festival)
+        if (['cafe','tea_house'].includes(shop.type) || festival)
           n.needs.fun = clamp(n.needs.fun - 35);
         f.satisfaction = clamp(95 - (f.priceFactor - 1) * 35);
         pulse(shop, `+${price} 金币`);
@@ -537,16 +553,18 @@ export function simulateTown(input: SimInput): SimOutput {
       n.recent = "在社区仓库领到一份食物，希望街角很快有商店。";
     }
     if (!bought && tick - (n.lastPurchase ?? -100) > 12) {
-      if (t.minute >= 1380 || t.minute < 420) {
+      if (shopShift) {
+        n.state='正在工作';n.destination=n.workplace;
+      } else if (t.minute >= 1380 || t.minute < 420) {
         n.state = "在家睡觉";
         n.destination = n.home;
         n.needs.fun = clamp(n.needs.fun - 0.2);
-      } else if (t.minute >= 1140 && parks.length) {
-        const park = parks[index % parks.length];
-        n.state = "在公园散步";
+      } else if (t.minute >= 1140 && t.minute < 1260 && localParks.length) {
+        const park = localParks[0];
+        n.state = "邻里休闲";
         n.destination = park.id;
-        n.needs.fun = clamp(n.needs.fun - 0.9);
-      } else if (working && n.workplace) {
+        if (!input.tiles || n.arrivedAt===park.id) n.needs.fun = clamp(n.needs.fun - 0.9);
+      } else if (shopShift && n.workplace) {
         n.state = "正在工作";
         n.destination = n.workplace;
       } else if (t.minute >= 720 && t.minute < 780) {
@@ -559,7 +577,7 @@ export function simulateTown(input: SimInput): SimOutput {
       }
     }
     if(input.tiles){n.destination=n.travelTarget;if(!n.arrivedAt)n.state=n.route?'正在前往目的地':'道路受阻';}
-    const target = clamp(Object.values(happinessFactors(n,buildings,defs)).reduce((a,b)=>a+b,0));
+    const target = clamp(Object.values(happinessFactors(n,buildings,defs,activeIds,bonuses.happiness)).reduce((a,b)=>a+b,0));
     n.happiness = clamp(
       (n.happiness ?? 78) + (target - (n.happiness ?? 78)) * 0.025,
     );

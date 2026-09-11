@@ -21,7 +21,6 @@ import { useBuildingDrag, dragSuppressesClick } from "./useBuildingDrag";
 import { canPlace, edgeTiles, roadType } from "../systems/economy";
 import { buildAt, selectBuilding } from "../game/actions";
 import { BuildingModel, Box } from "../buildings/Model";
-import { IconBuilding, preloadBuildingAssets } from "../buildings/IconBuilding";
 import { Person } from "../npcs/People";
 import { Atmosphere, Meteor } from "./Atmosphere";
 import { Studio } from "./Studio";
@@ -30,6 +29,8 @@ import { Ghost } from "../buildings/Ghost";
 import { InfluenceOverlay } from './InfluenceOverlay';
 import {LandOverlay} from './LandOverlay';
 import {placementReport} from '../systems/placement';
+import {Daylight} from './Daylight';
+import {nightfall} from '../systems/daylight';
 import type { Building, Tile, WorldId } from "../types";
 let lastBuildingClick: { id: string; time: number } | null = null;
 const popOut = (t: number) =>
@@ -159,11 +160,13 @@ function BuildingView({
   night,
   active,
   selected,
+  roadMask,
 }: {
   b: Building;
-  night: boolean;
+  night: number;
   active: boolean;
   selected: boolean;
+  roadMask?:number;
 }) {
   const [hover, setHover] = useState(false);
   const startDrag = useBuildingDrag(b);
@@ -178,9 +181,11 @@ function BuildingView({
   const ref = useRef<THREE.Group>(null!);
   useFrame(({ clock }) => {
     ref.current.position.y = 0;
-    const base = (width + depth) / 2;
+    const [baseWidth, baseDepth] = b.footprint ?? [1,1];
+    const height = Math.min(1.7, Math.sqrt(baseWidth * baseDepth));
     const age = b.born ? (Date.now() - b.born) / 550 : 1;
-    ref.current.scale.setScalar(age < 1 ? base * popOut(age) : base);
+    const pop = age < 1 ? popOut(Math.max(0,age)) : 1;
+    ref.current.scale.set(baseWidth * pop, height * pop, baseDepth * pop);
     if (b.type === "tree" || b.type === "netherplant" || b.type === "farm")
       ref.current.rotation.z = Math.sin(clock.elapsedTime * 0.8 + b.x) * 0.018;
     if (b.type === "core")
@@ -190,7 +195,7 @@ function BuildingView({
     <group position={[b.x+(width-1)/2, 0, b.z+(depth-1)/2]}>
       <group
         ref={ref}
-        scale={(width+depth)/2}
+        scale={[(b.footprint ?? [1,1])[0],Math.min(1.7,Math.sqrt(width*depth)),(b.footprint ?? [1,1])[1]]}
         rotation={[0, (b.rotation * Math.PI) / 2, 0]}
         onPointerOver={(e) => {
           e.stopPropagation();
@@ -211,13 +216,14 @@ function BuildingView({
           }
         }}
       >
-        <IconBuilding type={b.type} rotation={b.rotation} night={night} fallback={<BuildingModel
-          type={defs[b.type].modelType}
+        <group rotation={[0,roadMask===undefined?0:-b.rotation*Math.PI/2,0]}><BuildingModel
+          type={b.type}
           world={b.world}
           variant={Math.abs(b.x + b.z)}
           night={night}
           active={active}
-        />} />
+          roadMask={roadMask}
+        /></group>
       </group>
       {(selected || hover) && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} scale={[width,depth,1]} position={[0, 0.055, 0]}>
@@ -242,6 +248,11 @@ function BuildingView({
 function Camera({ interior, world }: { interior: boolean; world: WorldId }) {
   const ref = useRef<OrbitImpl>(null!);
   const { camera, size, gl } = useThree();
+  const cameraTiles = W(s=>s.tiles[world]);
+  const cameraBounds = useMemo(()=>({
+    minX:Math.min(-6,...cameraTiles.map(t=>t.x*3-1)),maxX:Math.max(6,...cameraTiles.map(t=>t.x*3+1)),
+    minZ:Math.min(-7,...cameraTiles.map(t=>t.z*3-1)),maxZ:Math.max(6,...cameraTiles.map(t=>t.z*3+1)),
+  }),[cameraTiles]);
   useEffect(() => {
     const doubleClick = (e: MouseEvent) => {
       if (
@@ -313,8 +324,8 @@ function Camera({ interior, world }: { interior: boolean; world: WorldId }) {
     if (ref.current) {
       const target = ref.current.target;
       const old = target.clone();
-      target.x = THREE.MathUtils.clamp(target.x, -6, 6);
-      target.z = THREE.MathUtils.clamp(target.z, -7, 6);
+      target.x = THREE.MathUtils.clamp(target.x, cameraBounds.minX, cameraBounds.maxX);
+      target.z = THREE.MathUtils.clamp(target.z, cameraBounds.minZ, cameraBounds.maxZ);
       target.y = 0;
       camera.position.add(target.clone().sub(old));
     }
@@ -359,19 +370,7 @@ function Scene() {
         .map((b) => [b.x, 0.04, b.z] as [number, number, number]),
     [local],
   );
-  const night =
-    settings.hour < 6 ||
-    settings.hour > 19 ||
-    settings.weather.includes("dusk");
-  const d = worlds[current];
-  const bg =
-    current === "overworld"
-      ? night
-        ? "#293a34"
-        : settings.sky === "warm"
-          ? "#ece5d6"
-          : d.background
-      : d.background;
+  const night = nightfall(settings.hour,settings.weather.includes('dusk'));
   const hover = ui.hover;
   const footprint: [number,number] = ui.moving ? (local.find(b=>b.id===ui.moving)?.footprint ?? [1,1]) : (defs[ui.placement ?? ""]?.size ?? [1,1]);
   const [previewWidth,previewDepth]=rotatedFootprint(footprint,ui.rotation);
@@ -387,21 +386,7 @@ function Scene() {
   };
   return (
     <>
-      <color attach="background" args={[bg]} />
-      <ambientLight intensity={night ? 0.55 : d.ambientLight} />
-      <hemisphereLight args={["#f4efdb", "#7e8966", 0.65]} />
-      <directionalLight
-        position={[night ? -6 : 8, night ? 5 : 15, 8]}
-        color={night ? "#d8ae84" : "#fff3d8"}
-        intensity={night ? 0.9 : 2.2}
-        castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-20}
-        shadow-camera-right={20}
-        shadow-camera-top={20}
-        shadow-camera-bottom={-20}
-        shadow-normalBias={0.04}
-      />
+      <Daylight world={current} hour={settings.hour} warm={settings.sky==='warm'} dusk={settings.weather.includes('dusk')}/>
       <Camera interior={interior} world={current} />
       <Diagnostics />
       {interior ? (
@@ -422,20 +407,19 @@ function Scene() {
               .map((b) => [b.x, b.z])}
             speed={settings.speed}
           />
-          <RoadSurface items={roads} world={current} />
           {local
-            .filter((b) => b.type !== "road")
             .map((b) => (
               <BuildingView
                 key={b.id}
                 b={b}
                 night={
                   b.type === "lamp"
-                    ? night && settings.weather.includes("lanterns")
+                    ? (settings.weather.includes("lanterns")?night:0)
                     : night
                 }
                 active={!b.paused && !offline.includes(b.id)}
                 selected={selected === b.id}
+                roadMask={b.type==='bridge'||!roadType(b.type)?undefined:([[0,-1],[1,0],[0,1],[-1,0]].reduce((mask,[dx,dz],i)=>mask|(local.some(other=>roadType(other.type)&&other.x===b.x+dx&&other.z===b.z+dz)?1<<i:0),0)||(b.rotation%2?10:5))}
               />
             ))}
           {npcs
@@ -494,12 +478,13 @@ function Scene() {
                   opacity={0.6}
                 />
               </mesh>
-              <group position={[0,-.12,0]} scale={(previewWidth+previewDepth)/2}><Ghost
+              <group position={[0,-.12,0]}><Ghost
                 key={ui.placement}
                 type={ui.placement}
                 world={current}
                 valid={!!valid}
                 rotation={ui.rotation}
+                footprint={footprint}
               /></group>
             </group>
           )}
@@ -573,15 +558,6 @@ function Dragon() {
   );
 }
 export default function World() {
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    let live = true;
-    const current = W.getState().current;
-    void preloadBuildingAssets([...B.getState().buildings.filter(b => b.world === current).map(b => b.type), "scenery_lake", "scenery_grass"])
-      .then(() => { if (live) setReady(true); });
-    return () => { live = false; };
-  }, []);
-  if (!ready) return <div className="world-loading" role="status">正在准备小镇素材…</div>;
   return (
     <Canvas
       orthographic
@@ -595,11 +571,25 @@ export default function World() {
   );
 }
 function Diagnostics() {
-  const { camera, gl } = useThree();
+  const { camera, gl, scene } = useThree();
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const w = window as unknown as { worldDiagnostics: unknown };
     w.worldDiagnostics = {
+      lighting: () => {
+        const sun=scene.children.find(o=>o instanceof THREE.DirectionalLight) as THREE.DirectionalLight|undefined;
+        let glow=0;
+        scene.traverse(o=>{if(o instanceof THREE.Mesh&&o.material instanceof THREE.MeshStandardMaterial)glow=Math.max(glow,o.material.emissiveIntensity);});
+        return {intensity:sun?.intensity,position:sun?.position.toArray(),background:scene.background instanceof THREE.Color?scene.background.toArray():null,glow};
+      },
+      models: () => {
+        const result: {type:string;size:number[];rotation:number;meshes:number}[]=[];
+        scene.updateMatrixWorld(true);
+        scene.traverse(obj=>{if(obj.name.startsWith('building-model:')){
+          let meshes=0;obj.traverse(child=>{if(child instanceof THREE.Mesh)meshes++;});
+          result.push({type:obj.name.slice(15),size:new THREE.Box3().setFromObject(obj).getSize(new THREE.Vector3()).toArray(),rotation:obj.parent?.rotation.y??0,meshes});
+        }});return result;
+      },
       picked: () => lastBuildingClick,
       state: () => ({
         town: T.getState(),
@@ -628,6 +618,6 @@ function Diagnostics() {
         triangles: gl.info.render.triangles,
       }),
     };
-  }, [camera, gl]);
+  }, [camera, gl, scene]);
   return null;
 }

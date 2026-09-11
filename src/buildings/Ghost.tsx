@@ -1,10 +1,36 @@
 import { useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
 import { BuildingModel } from "./Model";
-import { IconBuilding } from "./IconBuilding";
-import { defs } from "../data/definitions";
 import type { WorldId } from "../types";
 export function Ghost({
+  type,
+  world,
+  valid,
+  rotation,
+  footprint = [1, 1],
+}: {
+  type: string;
+  world: WorldId;
+  valid: boolean;
+  rotation: number;
+  footprint?: [number, number];
+}) {
+  return (
+    <group rotation={[0, (rotation * Math.PI) / 2, 0]}>
+      <group
+        scale={[
+          footprint[0],
+          Math.min(1.7, Math.sqrt(footprint[0] * footprint[1])),
+          footprint[1],
+        ]}
+      >
+        <ModelGhost type={type} world={world} valid={valid} rotation={0} />
+      </group>
+    </group>
+  );
+}
+
+function ModelGhost({
   type,
   world,
   valid,
@@ -15,10 +41,6 @@ export function Ghost({
   valid: boolean;
   rotation: number;
 }) {
-  return <IconBuilding type={type} rotation={rotation} ghost={valid} fallback={<ModelGhost type={defs[type]?.modelType ?? type} world={world} valid={valid} rotation={rotation} />} />;
-}
-
-function ModelGhost({ type, world, valid, rotation }: { type: string; world: WorldId; valid: boolean; rotation: number }) {
   const ref = useRef<THREE.Group>(null!);
   useLayoutEffect(() => {
     const clones: THREE.Material[] = [];
@@ -47,7 +69,7 @@ function ModelGhost({ type, world, valid, rotation }: { type: string; world: Wor
   }, [valid, type]);
   return (
     <group ref={ref} rotation={[0, (rotation * Math.PI) / 2, 0]}>
-      <BuildingModel type={type} world={world} />
+      <BuildingModel type={type} world={world} active={false} />
     </group>
   );
 }

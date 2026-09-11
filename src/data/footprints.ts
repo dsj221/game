@@ -1,6 +1,7 @@
 import type { Building } from "../types/index.ts";
 
 export const footprintSizes: Record<string, [number, number]> = {
+  orchard:[2,2],tea_house:[2,2],library:[2,2],pottery:[2,2],
   residence:[2,2], apartment:[2,2], market:[3,2], studio:[2,2],
   farm:[2,2], lumber:[2,2], windmill:[2,2], mine:[3,2],
   furnace:[2,1], slime:[2,2], drill:[2,2], generator:[2,1],

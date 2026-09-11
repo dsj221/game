@@ -1,6 +1,6 @@
 import type {Building,Npc,Tile,WorldId} from '../types/index.ts';
 import {uid} from './initial.ts';
-export function settlementTiles():Record<WorldId,Tile[]>{return{overworld:Array.from({length:12},(_,i)=>({x:i%4-2,z:Math.floor(i/4)-1,born:0})),nether:[{x:0,z:0,born:0}],end:[{x:0,z:0,born:0}]}}
+export function settlementTiles():Record<WorldId,Tile[]>{return{overworld:Array.from({length:12},(_,i)=>({x:i%4-2,z:Math.floor(i/4)-1,born:0})),nether:[],end:[]}}
 export function settlementBuildings():Building[]{return ([['house',-2,-2],['warehouse',2,-2],['tree',-4,-3],['tree',4,3],['tree',-3,3],['tree',3,-4],...Array.from({length:7},(_,i)=>['road',i-3,-1]),...Array.from({length:4},(_,i)=>['road',0,i]) ] as [string,number,number][]).map(([type,x,z])=>({id:uid(),type,x,z,world:'overworld',rotation:0,level:1,born:0}))}
 export function makeCitizen(id:string,index:number,home:string,world:WorldId='overworld'):Npc{return{id,name:['林小雨','陈阿禾','许小满','周星野','江月白','沈麦芽','苏禾','夏知秋','陆小川','白果'][index%10]+(index>=10?`·${Math.floor(index/10)+1}`:''),age:22+index%35,family:`${Math.floor(index/2)+1}号家庭`,home,workplace:'',profession:'待业',level:1,efficiency:1,world,modelType:'villager',phase:index*1.7,income:0,wallet:70,happiness:78,health:90,needs:{food:18,fun:20,shopping:15},state:'在家休息',destination:home,likes:index%2?['鲜花','散步']:['面包','公园'],recent:'很高兴在这里有一个家。',lastPurchase:-100}}
 export function settlementNpcs(buildings:Building[]){return[0,1].map(i=>makeCitizen(uid(),i,buildings.find(b=>b.type==='house')!.id))}

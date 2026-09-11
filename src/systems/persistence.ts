@@ -1,3 +1,5 @@
+import {validSchedule} from './workSchedule';
+import {migrateMainWorld} from './mainWorld';
 import {
   useBuildingStore as B,
   useGameStore as G,
@@ -13,6 +15,7 @@ import {useTownStore as T} from '../stores/useTownStore';
 import {emptyBag,initialTown} from '../data/town';
 import {makeCitizen} from '../data/settlement';
 import {metrics} from '../game/TownSimulation';
+import {initialDevelopment,civicProjects,commissions} from './development';
 export const SAVE_KEY = "kuai-block-save-v2";
 const LEGACY_KEY='kuai-block-save-v1';
 let resetting = false;
@@ -69,7 +72,7 @@ export function validate(data: unknown): ReturnType<typeof snapshot> {
   for (const w of ["overworld", "nether", "end"] as const) {
     assert(
       Array.isArray(d.world.tiles?.[w]) &&
-        d.world.tiles[w].length > 0 &&
+        (w!=='overworld'||d.world.tiles[w].length > 0) &&
         d.world.tiles[w].length <= 500,
       "地块数据无效",
     );
@@ -157,6 +160,8 @@ export function validate(data: unknown): ReturnType<typeof snapshot> {
     "totalEarned",
   ] as const)
     assert(num(d.game[k]), "进度数据无效");
+  d.game.forestGifts ??= Math.floor(d.game.collected/20);
+  assert(Number.isSafeInteger(d.game.forestGifts)&&num(d.game.forestGifts),'林间馈赠进度无效');
   assert(
     d.settings &&
       [0, 1, 2, 4].includes(d.settings.speed) &&
@@ -180,6 +185,7 @@ export function validate(data: unknown): ReturnType<typeof snapshot> {
   for(const key of ['completed','claimed','events','eventHistory','reports','notices','pulses'] as const)assert(Array.isArray(d.town[key]),'小镇进度无效');
   for(const key of ['migrationProgress','departProgress','peakPopulation','totalSales','nextEvent','seed'] as const)assert(num(d.town[key]),'经营状态无效');
   assert(d.town.facilities&&d.town.builtCounts&&d.town.metrics&&d.town.ledger,'缺少经营数据');
+  for(const f of Object.values(d.town.facilities))if(f.schedule!==undefined)assert(validSchedule(f.schedule),'员工排班无效');
   for(const f of Object.values(d.town.facilities))for(const key of ['progress','stock','staff','efficiency','revenue','costs','customers','satisfaction','priceFactor','produced','dailyRevenue','dailyCosts','dailyCustomers'] as const)assert(num(f[key]),'店铺数据无效');
   for(const n of d.npcs)if(n.modelType==='villager'){assert(num(n.wallet)&&num(n.happiness,0,100)&&num(n.health,0,100)&&num(n.age,0,130)&&n.needs&&typeof n.home==='string','居民生活数据无效');for(const need of Object.values(n.needs))assert(num(need,0,100),'居民需求无效');
     if(n.position)assert(num(n.position.x,-300,300)&&num(n.position.z,-300,300),'居民位置无效');
@@ -199,10 +205,22 @@ export function validate(data: unknown): ReturnType<typeof snapshot> {
   for (const v of Object.values(d.town.builtCounts)) assert(num(v), "建造进度无效");
   for (const k of ["completed","claimed","eventHistory"] as const) assert(d.town[k].every(v => typeof v === "string"), "任务进度无效");
   for (const k of ["food","fun","shopping"] as const) for (const n of d.npcs.filter(n=>n.modelType==="villager")) assert(num(n.needs?.[k],0,100), "居民需求无效");
+  d.town.development ??= initialDevelopment();
+  const dev=d.town.development;
+  for(const k of ['boardDay','total','reputation','policyDay'] as const)assert(Number.isInteger(dev[k])&&num(dev[k],0,1e9),'发展进度数值无效');
+  assert(['balanced','industry','leisure'].includes(dev.policy),'经营方针无效');
+  assert(Array.isArray(dev.projects)&&dev.projects.length<=5&&new Set(dev.projects).size===dev.projects.length&&dev.projects.every(id=>civicProjects.some(p=>p.id===id)),'公共工程进度无效');
+  assert(Array.isArray(dev.delivered)&&dev.delivered.length<=3&&new Set(dev.delivered).size===dev.delivered.length&&dev.delivered.every(id=>commissions.some(c=>id===`${dev.boardDay}:${c.id}`)),'委托进度无效');
   d.town.metrics = metrics(d.buildings,d.npcs,d.resources.bag,d.town.facilities);
   return d;
 }
 function apply(d: ReturnType<typeof snapshot>) {
+  // Keep a recoverable copy before removing retired-world state.
+  if(d.world.current!=='overworld'||d.buildings.some(b=>b.world!=='overworld'||['portal','endportal','core','netherplant','obsidian'].includes(b.type))||d.world.tiles.nether.length||d.world.tiles.end.length){
+    if(!localStorage.getItem(SAVE_KEY+'-before-main-world'))localStorage.setItem(SAVE_KEY+'-before-main-world',JSON.stringify(d));
+  }
+  migrateMainWorld(d);
+  d.town.metrics=metrics(d.buildings,d.npcs,d.resources.bag,d.town.facilities);
   R.setState(d.resources);
   W.setState({ ...d.world, interior: false });
   B.setState({

@@ -1,5 +1,6 @@
 import type { Building, Tile } from "../types/index.ts";
 import { buildingCells } from "../data/footprints.ts";
+import {isRoad,roadStyles} from '../data/roads.ts';
 export type Point = { x: number; z: number };
 const key = (p: Point) => `${p.x},${p.z}`;
 const steps = [
@@ -19,8 +20,8 @@ export function navigationGrid(tiles: Tile[], buildings: Building[]) {
         grid.set(`${t.x * 3 + x},${t.z * 3 + z}`, 2.5);
   for (const b of buildings)
     for (const c of buildingCells(b)) {
-      if (["road", "bridge"].includes(b.type))
-        grid.set(key(c), b.type === "road" ? 1 / 1.3 : 1);
+      if (isRoad(b.type))
+        grid.set(key(c), roadStyles[b.type]?.weight??1);
       else grid.delete(key(c));
     }
   if (!grids.has(tiles)) grids.set(tiles, new WeakMap());

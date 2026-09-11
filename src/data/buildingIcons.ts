@@ -47,7 +47,8 @@ export function getBuildingIcon(type: string, size: 256 | 512 = 256) {
   if (type === "bench") return `${import.meta.env.BASE_URL}assets/building-icons/park-bench.png`;
   if (type === "road") return `${import.meta.env.BASE_URL}assets/building-icons/stone-road.png`;
   if (type === "tree") return `${import.meta.env.BASE_URL}assets/building-icons/square-crown-tree.png`;
-  const icon = iconsByKey.get(buildingIconKeys[type] ?? type);
+  const additions:Record<string,string>={orchard:'vegetable_garden',tea_house:'gazebo',library:'tool_shop',pottery:'clay_kiln'};
+  const icon = iconsByKey.get(additions[type]??buildingIconKeys[type] ?? type);
   return icon
     ? `${import.meta.env.BASE_URL}assets/building-icons/${size === 512 ? icon.file_512 : icon.file_256}`
     : undefined;

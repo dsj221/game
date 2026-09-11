@@ -67,13 +67,13 @@ export function TopHUD() {
         </b>
         <small>慢慢来，日子还长</small>
       </button>
-      <div className="hud-pill coins primary">
+      <button className="hud-pill coins primary" onClick={()=>panel('daily')} aria-label="查看经营日报">
         <Coins size={20} />
         <div>
           <b data-testid="currency">{format(r.currency)}</b>
           <small>{`今日净额 ${(t.ledger.revenue - t.ledger.wages - t.ledger.maintenance - t.ledger.purchases).toFixed(0)}`}</small>
         </div>
-      </div>
+      </button>
       <button className="hud-pill primary" onClick={() => panel("village")}>
         <Users size={18} />
         <div>

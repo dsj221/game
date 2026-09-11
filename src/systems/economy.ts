@@ -1,7 +1,8 @@
 import type { Building, Tile, Bag, Npc } from "../types/index.ts";
 import { defs } from "../data/definitions.ts";
 import { buildingCells } from "../data/footprints.ts";
-export const roadType = (type: string) => type === "road" || type === "bridge";
+export {isRoad as roadType} from '../data/roads.ts';
+import {isRoad as roadType} from '../data/roads.ts';
 export const key = (x: number, z: number) => `${x},${z}`;
 export const onLand = (x: number, z: number, tiles: Tile[]) =>
   tiles.some((t) => Math.abs(x - t.x * 3) <= 1 && Math.abs(z - t.z * 3) <= 1);
@@ -39,6 +40,7 @@ export function edgeTiles(tiles: Tile[]) {
   return [...result.values()];
 }
 export function connectedBuildings(buildings: Building[]) {
+  buildings = buildings.filter(b=>!b.paused);
   const roads = new Map(
     buildings.filter((b) => roadType(b.type)).map((b) => [key(b.x, b.z), b]),
   );
@@ -95,7 +97,7 @@ export function computeProduction(
   energy: number,
   maxEnergy: number,
 ) {
-  const connected = connectedBuildings(buildings);
+  const connected = ['overworld','nether','end'].flatMap(world => connectedBuildings(buildings.filter(b=>b.world===world && !b.paused)));
   const linked = new Set(connected);
   const helper = Math.min(
     0.25,
@@ -106,9 +108,10 @@ export function computeProduction(
     income = 0;
   const output: Bag = { wood: 0, stone: 0, iron: 0, redstone: 0, food: 0,wheat:0,flour:0,bread:0,furniture:0 };
   const offline: string[] = [];
-  for (const b of buildings) generation += defs[b.type].power * b.level;
+  for (const b of buildings) if (!b.paused) generation += defs[b.type].power * b.level;
   let available = Math.min(maxEnergy, energy + generation);
   for (const b of buildings) {
+    if (b.paused) continue;
     const d = defs[b.type],
       cost = d.energyCost * b.level;
     consumption += cost;

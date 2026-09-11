@@ -1,5 +1,6 @@
 import type { BuildingDefinition, Bag } from "../types/index.ts";
 import type { Facility, Ledger, TownState } from "../types/town.ts";
+import {initialDevelopment} from '../systems/development.ts';
 export const emptyBag = (): Bag => ({
   wood: 0,
   stone: 0,
@@ -72,6 +73,7 @@ export const townLevels = [
   {level:5,name:'梦想之城',population:100,earned:3000,description:'让每一位邻居，都找到自己的小小世界。'},
 ];
 export const initialTown = (): TownState => ({
+  development:initialDevelopment(),
   day: 1,
   minute: 420,
   level: 1,

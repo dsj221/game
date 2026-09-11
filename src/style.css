@@ -23,6 +23,7 @@ body,
   height: 100%;
   overflow: hidden;
 }
+.catalog-tools{display:flex;gap:8px;margin:12px 0}.catalog-tools input{min-width:0;flex:1;padding:10px;border:1px solid var(--line);background:#f6f4e9;border-radius:5px}.catalog-tools select{max-width:140px;border:1px solid var(--line);background:#f6f4e9;color:inherit}
 button,
 a,
 input {
@@ -1369,6 +1370,9 @@ hr {
 .warning {
   color: #ad7857;
   font-size: 12px;
+}
+.world-title h1,.world-title p,.world-meta,.world-bottom-info,.collect-hint,.next-goal,.world-tabs,.world-tabs button,.town-news button {
+  transition: color 1.8s ease, background-color 1.8s ease, border-color 1.8s ease;
 }
 .dark-world .world-title h1 {
   color: #e4dcc8;

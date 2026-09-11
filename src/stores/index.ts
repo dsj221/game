@@ -98,6 +98,7 @@ export const useSettingsStore = create<{
 }));
 export const useGameStore = create<{
   resonance: number;
+  forestGifts: number;
   achievements: string[];
   ticks: number;
   collected: number;
@@ -115,6 +116,7 @@ export const useGameStore = create<{
   floating: { id: number; value: number }[];
 }>(() => ({
   resonance: 0,
+  forestGifts: 0,
   achievements: [],
   ticks: 0,
   collected: 0,

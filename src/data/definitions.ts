@@ -2,6 +2,8 @@ import type { BuildingDefinition, WorldDefinition, WorldId } from "../types";
 import {townConfig,townNames,townPrices} from './town.ts';
 import { buildingIconCatalog } from './buildingIcons.ts';
 import { plannedFootprint } from './footprints.ts';
+import {roadStyles} from './roads.ts';
+import {catalogOperations} from './catalogOperations.ts';
 export const worlds: Record<WorldId, WorldDefinition> = {
   overworld: {
     id: "overworld",
@@ -185,6 +187,20 @@ for(const [id,modelType,description] of [
 ])definitions.push(def(id,townNames[id], '村庄',modelType,townPrices[id],0,{description}));
 for(const d of definitions){d.town=townConfig[d.id];if(!d.town)continue;d.incomePerSecond=0;d.category=d.town.category;d.name=townNames[d.id]||d.name;d.cost=townPrices[d.id]??d.cost;d.upgradeCost=Math.round(d.cost*.8);if(d.town.capacity)d.population=d.town.capacity;if(['house','farm','lumber','windmill','shop'].includes(d.id)){d.materials=d.id==='house'?{wood:5}:undefined;d.description={house:'提供 2 个居住名额。有人入住后才产生租金；升级增加容量。',farm:'30 秒收获小麦 ×5、食物 ×3。员工不足会延长生产周期。',lumber:'20 秒生产木材 ×5，为住宅与家具制造提供原料。',windmill:'小麦 ×3 → 面粉 ×4，每个生产周期 18 秒。',shop:'采购食物，居民付款后获得营业额。无人消费时仍有工资和维护成本。'}[d.id]!;}if(d.id==='tree')d.production={};}
 for (const d of definitions) if (['park'].includes(d.id)) d.influenceRadius=3; else if (['shop','breadshop','market','cafe'].includes(d.id)) d.influenceRadius=4; else if (['house','residence','apartment'].includes(d.id)) d.influenceRadius=3;
+for(const [id,r] of Object.entries(roadStyles))if(id!=='road')definitions.push(def(id,r.name,'道路',id,r.cost,0,{maxLevel:1,description:`连接物流与居民通行。自动衔接直线、转角、丁字和十字路口；${id==='dirt_path'?'造价低，步行稍慢。':'可连续点击铺设。'}`}));
+definitions.push(
+ def('orchard','丰收果园','生产','orchard',350,0,{town:{category:'生产',jobs:2,wage:8,upkeep:3,unlock:2,cycle:40,output:{food:6},environment:2},description:'照料果树，每40秒收获6份食物；需要员工。',maxLevel:3}),
+ def('tea_house','邻里茶馆','商业','tea_house',550,0,{town:{category:'商业',jobs:1,wage:10,upkeep:4,unlock:2,sells:'food',price:15,wholesale:3,happiness:2},description:'采购食物供邻居消费，产生真实销售收入，并改善附近幸福度。',maxLevel:3}),
+ def('library','街角图书馆','公共','library',950,0,{town:{category:'公共',jobs:1,wage:10,upkeep:5,unlock:3,happiness:3,environment:2},description:'为周围四格住宅提供幸福度加成，每日有工资和维护成本。',maxLevel:3}),
+ def('pottery','陶艺工坊','生产','pottery',700,0,{town:{category:'生产',jobs:2,wage:10,upkeep:4,unlock:3,cycle:40,recipe:{stone:3,wood:2},output:{furniture:2}},description:'石头3＋木材2加工成家具2，供应中央集市；附近住宅会受到工业噪声影响。',maxLevel:3}),
+);
+for (const d of definitions) {
+  const operation = catalogOperations[d.id];
+  if (operation) { d.town=operation.town; d.category=operation.town.category; d.description=operation.description; }
+  if (d.id==='tree') d.description='改善环境评分，两格内住宅幸福加成0.5；木材由伐木场生产。';
+  if (d.id==='obsidian') d.description='三格内生产设施效率提高15%，与仓库、干草棚物流加成不叠加；可辅助末地生产布局。';
+  if (d.id==='studio') d.description='员工到岗并在工作时间直播，按观众数结算频道收入；设备与布置改善直播效果。';
+}
 export const defs = Object.fromEntries(
   definitions.map((d) => { d.size = plannedFootprint(d.id); if(d.town)d.maxLevel=3; return [d.id, d]; }),
 ) as Record<string, BuildingDefinition>;
@@ -196,19 +212,17 @@ export const resourceNames = {
   food: "食物",
   wheat:'小麦',flour:'面粉',bread:'面包',furniture:'家具',
 };
+export const playableDefinitions=definitions.filter(d=>(d.world==='all'||d.world==='overworld')&&!['portal','endportal','core','netherplant','obsidian'].includes(d.id));
 export const achievementDefs = [
-  ["first", "万物第一次", "完成一次采集"],
+  ["first", "万物第一次", "完成一次获取金币"],
   ["expand", "大桥在生长", "扩张一块大陆"],
   ["idle", "放下双手", "让世界运行一分钟"],
   ["live", "我们开播了", "切换一次直播节目"],
-  ["nether", "另一个天空", "抵达下界"],
-  ["end", "龙也来上班", "抵达末地"],
   ["audience", "整个世界听我说", "观众达到 1,000"],
   ["rain", "终于有雨季", "开启雨季"],
   ["farm", "麦田的风", "建设一块农田"],
   ["road", "通向远方", "铺设一段道路"],
   ["upgrade", "精益求精", "升级一座建筑"],
-  ["worlds", "世界之外", "探索三个世界"],
   ["rich", "亿点可能", "累计财富达到 100,000"],
   ["helper", "小帮手，大忙碌", "招募一个傀儡"],
   ["tree", "种下小宇宙", "种下一棵树"],

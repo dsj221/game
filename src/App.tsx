@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from "react";
+import {daylight} from './systems/daylight';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -10,7 +11,7 @@ import {
   HelpCircle,
   Leaf,
   MousePointer2,
-  Pickaxe,
+  Coins,
   Plus,
   RotateCcw,
   Save,
@@ -97,9 +98,7 @@ export default function App() {
   );
   const dark =
     w.current !== "overworld" ||
-    s.hour < 6 ||
-    s.hour > 19 ||
-    s.weather.includes("dusk");
+    daylight(s.hour,s.weather.includes('dusk')) < .5;
   const title = w.interior
     ? "我的直播间"
     : w.current === "overworld"
@@ -135,7 +134,7 @@ export default function App() {
                   <ArrowLeft size={15} /> 返回世界
                 </button>
               ) : (
-                (Object.keys(worlds) as WorldId[]).map((id, i) => (
+                (['overworld'] as WorldId[]).map((id, i) => (
                   <button
                     className={w.current === id ? "active" : ""}
                     key={id}
@@ -249,12 +248,12 @@ export default function App() {
                 onKeyUp={() => U.setState({ collecting: false })}
                 onBlur={() => U.setState({ collecting: false })}
               >
-                <Pickaxe size={21} />
-                <b>采集</b>
-                <span>+1 木材</span>
+                <Coins size={21} />
+                <b>获取金币</b>
+                <span>+{1+(g.forestGifts??Math.floor(g.collected/20))} 金币</span>
                 <small>按住</small>
               </button>
-              <span className="collect-hint">一锤一镐，也是一种生活。</span>
+              <span className="collect-hint">每完成一次林间馈赠，单次获取金币永久 +1。</span>
             </div>
           )}
           {ui.placement&&ui.placement!=='expand'&&<PlacementBar key={`${ui.placement}:${ui.moving||'new'}`}/>}

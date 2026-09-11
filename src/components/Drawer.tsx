@@ -36,7 +36,7 @@ import {
   useWorldStore as W,
 } from "../stores";
 import {
-  definitions,
+  playableDefinitions as definitions,
   defs,
   resourceNames,
   worlds,
@@ -49,7 +49,6 @@ import {
   selectBuilding,
   studioAction,
   setProgram,
-  switchWorld,
   trade,
   upgrade,
   rotateBuilding,
@@ -95,15 +94,17 @@ function Tabs({ items }: { items: string[] }) {
 function Card({
   d,
   owned = false,
+  instanceId,
 }: {
   d: BuildingDefinition;
   owned?: boolean;
+  instanceId?:string;
 }) {
   const { buildings, offline, connected } = B(),
     world = W((s) => s.current),
     currency = R((s) => s.currency);
   const found = buildings.filter((b) => b.world === world && b.type === d.id),
-    b = found[0];
+    b = instanceId?found.find(v=>v.id===instanceId):found[0];
   const price = owned && b ? upgradePrice(b) : d.cost;
   return (
     <article className="facility">
@@ -118,7 +119,7 @@ function Card({
           <h3>{d.name}</h3>
           <span className="subtle">
             {owned && b
-              ? `${b.level} 级 · ${offline.includes(b.id) ? "等待能源" : connected.includes(b.id) ? "道路已连接" : "物流效率 50%"}`
+              ? `${b.level} / ${d.maxLevel} 级 · 坐标 ${b.x},${b.z} · ${offline.includes(b.id) ? "等待能源" : connected.includes(b.id) ? "道路已连接" : "未连接物流网络"}`
               : d.power
                 ? `发电 +${d.power} E / 秒`
                 : d.energyCost
@@ -169,22 +170,27 @@ function Card({
           onClick={() => (owned && b ? upgrade(b.id) : beginBuild(d.id))}
         >
           {!unlocked(d.id) ? <Lock size={13} /> : <Plus size={14} />}{" "}
-          {format(price)} {owned ? "升级" : "建造"}
+          {owned&&b&&b.level>=d.maxLevel?'已满级':`${format(price)} ${owned ? "升级" : "建造"}`}
         </button>
       </div>
     </article>
   );
 }
 function Shop() {
+  const [query,setQuery]=useState(''),[sort,setSort]=useState('默认'),[upgradeOnly,setUpgradeOnly]=useState(false);
   const category = U((s) => s.category),
     setCategory = (category: string) => U.setState({ category });
   const tab = U((s) => s.tab) || "发现",
     world = W((s) => s.current),
     tiles = W((s) => s.tiles),
     buildings = B((s) => s.buildings);
+  const local=buildings.filter(b=>b.world===world);
+  const catalog=definitions.filter(d=>(d.world==='all'||d.world===world)&&(category==='全部'||d.category===category)&&(`${d.name}${d.description}`.includes(query.trim())));
+  const ordered=[...catalog].sort((a,b)=>sort==='价格从低到高'?a.cost-b.cost:sort==='名称'?a.name.localeCompare(b.name,'zh-CN'):0);
   return (
     <>
       <Tabs items={["发现", "已购买", "扩地+"]} />
+      <p className="note">当前世界已有 {local.length} 座设施 · {local.filter(b=>b.level<defs[b.type].maxLevel).length} 座未满级</p>
       {tab === "扩地+" ? (
         <>
           <div className="panel-intro">
@@ -233,17 +239,10 @@ function Shop() {
           <div className="list-caption">
             慢慢建造，让世界成为你的模样。<span>{worlds[world].name}</span>
           </div>
-          {definitions
-            .filter(
-              (d) =>
-                (d.world === "all" || d.world === world) &&
-                (category === "全部" || d.category === category) &&
-                (tab !== "已购买" ||
-                  buildings.some((b) => b.world === world && b.type === d.id)),
-            )
-            .map((d) => (
-              <Card key={d.id} d={d} owned={tab === "已购买"} />
-            ))}
+          <div className="catalog-tools"><input aria-label="搜索设施" placeholder="搜索名称或用途…" value={query} onChange={e=>setQuery(e.target.value)}/><select aria-label="商城排序" value={sort} onChange={e=>setSort(e.target.value)}>{['默认','价格从低到高','名称'].map(s=><option key={s}>{s}</option>)}</select></div>
+          {tab==='已购买'&&<label className="note"><input type="checkbox" checked={upgradeOnly} onChange={e=>setUpgradeOnly(e.target.checked)}/> 仅看未满级设施</label>}
+          {tab==='已购买'?ordered.flatMap(d=>local.filter(b=>b.type===d.id&&(!upgradeOnly||b.level<d.maxLevel)).map(b=><Card key={b.id} d={d} owned instanceId={b.id}/>)):ordered.map(d=><Card key={d.id} d={d}/>)}
+          {(!ordered.length||(tab==='已购买'&&!local.some(b=>ordered.some(d=>d.id===b.type)&&(!upgradeOnly||b.level<defs[b.type].maxLevel))))&&<p className="note">没有符合条件的设施，请调整搜索或分类。</p>}
         </>
       )}
     </>
@@ -452,16 +451,16 @@ function Detail() {
   return (
     <>
       <div className="detail-art">
-        {getBuildingIcon(d.id) && modelFor !== b.id ? (
+        {getBuildingIcon(d.id) && modelFor === b.id ? (
           <Thumbnail type={d.id} modelType={d.modelType} size={512} />
         ) : (
-          <ModelPreview type={d.modelType} world={world} />
+          <ModelPreview key={b.id} type={d.id} world={world} />
         )}
         <span>LV. {String(b.level).padStart(2, "0")}</span>
       </div>
       {getBuildingIcon(d.id) && (
         <button className="text-button" onClick={() => setModelFor(modelFor === b.id ? null : b.id)}>
-          {modelFor === b.id ? "查看建筑图标" : "查看 3D 模型"}
+          {modelFor === b.id ? "查看 3D 模型" : "查看原画图标"}
         </button>
       )}
       <span className="eyebrow">
@@ -502,14 +501,6 @@ function Detail() {
           <Radio size={16} /> 进入我的直播间
         </button>
       )}
-      {["portal", "endportal"].includes(b.type) && (
-        <button
-          className="secondary wide"
-          onClick={() => switchWorld(b.type === "portal" ? "nether" : "end")}
-        >
-          穿过传送门 <ArrowUpRight size={16} />
-        </button>
-      )}
       <div className="section-title">它让这些成为可能</div>
       {(d.id === "market"
         ? ["资源交易", "我的直播间", "观众订单"]
@@ -539,7 +530,7 @@ function Book() {
   const ids = new Set(buildings.map((b) => b.type));
   return (
     <>
-      <Tabs items={["全部", "工具", "村庄", "红石", "直播", "下界", "末地"]} />
+      <Tabs items={["全部", "工具", "村庄", "红石", "直播"]} />
       <div className="panel-intro">
         <h2>小世界，大有可能。</h2>
         <p>每一项发现，都来自你在世界里留下的痕迹。</p>
@@ -608,7 +599,7 @@ function StudioPanel() {
       <Tabs items={["节目", "观众", "订单"]} />
       <div className="broadcast">
         <span>
-          <i /> 正在直播的世界
+          <i /> {g.studioIncome>0?'正在直播的世界':'直播待机 · 等待员工到岗'}
         </span>
         <h2>{format(g.viewers)}</h2>
         <small>正在观看 · {worlds[W.getState().current].name}</small>
@@ -619,7 +610,7 @@ function StudioPanel() {
       {tab === "节目" ? (
         <>
           <div className="section-title">选择节目</div>
-          {["田园时光", "工厂实录", "异界奇遇"].map((p, i) => (
+          {["田园时光", "工厂实录"].map((p, i) => (
             <button
               className={`program ${g.program === p ? "active" : ""}`}
               key={p}
@@ -638,8 +629,7 @@ function StudioPanel() {
                   {
                     [
                       "主世界观众增长加成",
-                      "全部经营收入提高 10%",
-                      "下界与末地观众增长加成",
+                      "频道直播收入提高 10%",
                     ][i]
                   }
                 </small>
@@ -686,7 +676,7 @@ function StudioPanel() {
             收礼 · {g.gifts * 40} 金币
           </button>
           <p className="note">
-            直播每 15 秒收到一份礼物。节目适合当前世界时观众增长更快。
+            员工到岗、工作时段开播，每15个经营Tick收到一份礼物。节目适合直播间所在世界时观众增长更快。
           </p>
         </>
       ) : (

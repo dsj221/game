@@ -8,12 +8,23 @@ import {
   useWorldStore as W,
 } from "../stores";
 import { defs } from "../data/definitions";
+import {retiredBuildingTypes} from '../data/playable';
 import { uid } from "../data/initial";
 import { useTownStore as T } from "../stores/useTownStore";
 import { simulateTown, metrics } from "./TownSimulation";
+import {validSchedule,type WorkSchedule} from '../systems/workSchedule';
+import {broadcastStep} from '../systems/broadcast';
+import {developmentAction} from '../systems/development';
+export function developTown(kind:'order'|'project'|'policy',id:string,allowFood=false){
+  const result=developmentAction(T.getState(),R.getState().bag,R.getState().currency,B.getState().buildings,{kind,id,allowFood});
+  if('error' in result)return notify(result.error);
+  T.setState(result.town);R.setState({bag:result.bag,currency:result.currency});
+  notify(result.message!);tone('build');
+}
 import { quests, townLevels, emptyFacility } from "../data/town";
 import {
   canPlace,
+  roadType,
   computeProduction,
   edgeTiles,
   expansionTotal,
@@ -26,6 +37,7 @@ let toastTimer: ReturnType<typeof setTimeout>;
 export function tick() {
   const settings = S.getState();
   for (let i = 0; i < settings.speed; i++) {
+    const power = computeProduction(B.getState().buildings, [], R.getState().energy, 480);
     const result = simulateTown({
       town: T.getState(),
       buildings: B.getState().buildings,
@@ -35,7 +47,17 @@ export function tick() {
       tick: G.getState().ticks,
       weather: settings.weather,
       tiles: W.getState().tiles,
+      offline: power.offline,
     });
+    const broadcast = broadcastStep(result.buildings,result.town.facilities,G.getState(),true,result.tick);
+    result.currency += broadcast.income;
+    result.net += broadcast.income;
+    result.town.ledger.revenue += broadcast.income;
+    for (const revenue of broadcast.revenues) {
+      const facility=result.town.facilities[revenue.id];
+      facility.revenue+=revenue.amount; facility.dailyRevenue+=revenue.amount;
+    }
+    G.setState({viewers:broadcast.viewers,studioIncome:broadcast.income,gifts:broadcast.gifts});
     const oldNotice = T.getState().notices[0]?.id;
     T.setState(result.town);
     N.setState({ npcs: result.npcs });
@@ -49,28 +71,8 @@ export function tick() {
       totalEarned: G.getState().totalEarned + Math.max(0, result.net),
     });
     if (settings.cycle) S.setState({ hour: result.town.minute / 60 });
-    const connected: string[] = [];
-    let generation = 0,
-      consumption = 0;
-    const offline: string[] = [];
-    for (const world of ["overworld", "nether", "end"] as WorldId[]) {
-      const power = computeProduction(
-        B.getState().buildings.filter((b) => b.world === world),
-        [],
-        R.getState().energy,
-        480,
-      );
-      connected.push(...power.connected);
-      generation += power.generation;
-      consumption += power.consumption;
-      offline.push(...power.offline);
-    }
-    B.setState({ connected, offline });
-    R.setState((s) => ({
-      energy: Math.max(0, Math.min(480, s.energy + generation - consumption)),
-      generation,
-      consumption,
-    }));
+    B.setState({ connected:power.connected, offline:power.offline });
+    R.setState({energy:power.energy,generation:power.generation,consumption:power.consumption});
     const latest = result.town.notices[0];
     if (
       latest &&
@@ -178,6 +180,11 @@ export function setPrice(id: string, factor: number) {
     },
   }));
 }
+export function setWorkSchedule(id:string,schedule:WorkSchedule|undefined){
+  if(schedule&&!validSchedule(schedule)){notify('请选择不同的上下班时间');return;}
+  if(!B.getState().buildings.some(b=>b.id===id&&defs[b.type].town?.jobs))return;
+  T.setState(t=>({facilities:{...t.facilities,[id]:{...(t.facilities[id]||emptyFacility()),schedule}}}));
+}
 export function notify(toast: string) {
   U.setState({ toast });
   clearTimeout(toastTimer);
@@ -194,6 +201,7 @@ export function panel(panel: Panel, tab = "") {
   tone();
 }
 export function switchWorld(current: WorldId) {
+  if(current!=='overworld')return;
   W.setState((s) => ({
     current,
     interior: false,
@@ -215,6 +223,9 @@ export function selectBuilding(id: string, inside = false) {
   const b = B.getState().buildings.find((b) => b.id === id);
   if (!b) return;
   B.setState({ selected: id });
+  if(W.getState().current!==b.world)W.setState({current:b.world,interior:false});
+  const [width,depth]=b.rotation%2?[(b.footprint??[1,1])[1],(b.footprint??[1,1])[0]]:(b.footprint??[1,1]);
+  U.setState({cameraFocus:{x:b.x+(width-1)/2,z:b.z+(depth-1)/2,nonce:Date.now()}});
   if (inside && b.type === "studio") {
     W.setState({ interior: true });
     panel("studio", "节目");
@@ -231,6 +242,7 @@ export function unlocked(type: string) {
   );
 }
 export function beginBuild(type: string) {
+  if(retiredBuildingTypes.has(type))return;
   if (!unlocked(type))
     return notify(
       `需要小镇 Lv.${defs[type]?.town?.unlock || 1}${defs[type]?.unlockRequirements ? `，并建设${defs[defs[type].unlockRequirements!].name}` : ""}`,
@@ -282,7 +294,7 @@ export function buildAt(x: number, z: number) {
   const d = defs[ui.placement],
     r = R.getState();
   if (!unlocked(d.id)) return notify("这座设施尚未解锁");
-  if (r.currency < d.cost) return notify("金币不足，按住采集或等待生产");
+  if (r.currency < d.cost) return notify("金币不足，按住获取金币或等待经营收入");
   for (const [k, v] of Object.entries(d.materials || {}))
     if (r.bag[k as Resource] < v)
       return notify(`${k === "wood" ? "木材" : "铁矿"}不足`);
@@ -319,7 +331,7 @@ export function buildAt(x: number, z: number) {
   if (["tree", "road", "farm"].includes(d.id)) achieve(d.id);
   tone("build");
   notify(`${d.name}已建成`);
-  if (d.id !== "road" && d.id !== "tree") cancelBuild();
+  if (!roadType(d.id) && d.id !== "tree") cancelBuild();
 }
 export function expand() {
   const world = W.getState().current,
@@ -411,27 +423,27 @@ export function rotateBuilding(id:string){
 }
 export function collect() {
   if (S.getState().speed === 0) return;
-  const value = 0;
+  const game=G.getState();
+  const gifts=game.forestGifts??Math.floor(game.collected/20);
+  const value = 1+gifts;
+  const completed=game.resonance+5>=100;
   R.setState((s) => ({
     currency: s.currency + value,
-    bag: {
-      ...s.bag,
-      wood: s.bag.wood + 1,
-    },
   }));
+  T.setState(s=>({ledger:{...s.ledger,revenue:s.ledger.revenue+value}}));
   G.setState((s) => ({
     resonance: (s.resonance + 5) % 100,
+    forestGifts:gifts+(completed?1:0),
     collected: s.collected + 1,
     totalEarned: s.totalEarned + value,
     floating: [...s.floating.slice(-4), { id: Date.now(), value }],
   }));
   achieve("first");
-  if (G.getState().resonance === 0) {
+  if (completed) {
     R.setState((s) => ({
-      bag: { ...s.bag, wood: s.bag.wood + 5 },
       energy: s.maxEnergy,
     }));
-    notify("林间的馈赠：额外获得 5 木材");
+    notify(`林间馈赠完成：每次获取金币 +1，之后每次获得 ${value+1} 金币`);
     tone("build");
   } else tone("collect");
 }
@@ -510,6 +522,7 @@ export function setProgram(program: string) {
   tone();
 }
 export function studioAction(action: string) {
+  if (!B.getState().buildings.some(b=>b.type==='studio' && !b.paused)) return notify('请先建设并开放直播间');
   const s = G.getState(),
     r = R.getState();
   if (action === "收礼") {

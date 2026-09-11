@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { getBuildingIcon } from "../data/buildingIcons";
+import {roadStyles} from '../data/roads';
 
 export function Thumbnail({ type, modelType = type, size = 256 }: { type: string; modelType?: string; size?: 256 | 512 }) {
   const src = getBuildingIcon(type, size);
@@ -11,6 +12,7 @@ export function Thumbnail({ type, modelType = type, size = 256 }: { type: string
 }
 
 function FallbackThumbnail({ type }: { type: string }) {
+  if(roadStyles[type])return <svg viewBox="0 0 100 86" className="thumbnail" aria-hidden="true"><path d="M6 43 50 18 94 43 50 70Z" fill={roadStyles[type].color}/><path d="m6 43 44 27 44-27v7L50 77 6 50Z" fill="#7b705a"/><path d="m24 33 44 26m-26-36 44 26M24 54l44-26M40 64l44-26" stroke="#e2d4b9" strokeWidth="2"/></svg>;
   const mechanical = [
     "drill",
     "furnace",

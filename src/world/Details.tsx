@@ -4,12 +4,13 @@ import * as THREE from "three";
 import { useSettingsStore } from "../stores";
 import type { Building, Tile } from "../types";
 import { sceneryLayout, sceneryNoise as noise } from "./sceneryLayout";
-import { IconBuilding } from "../buildings/IconBuilding";
+import { BuildingModel } from "../buildings/Model";
+import {nightfall} from '../systems/daylight';
 
 
 export function Scenery({ world, tiles, buildings }: { world: string; tiles: Tile[]; buildings: Building[] }) {
   const speed = useSettingsStore(s => s.speed);
-  const night = useSettingsStore(s=>s.hour<6 || s.hour>19 || s.weather.includes("dusk"));
+  const night = useSettingsStore(s=>nightfall(s.hour,s.weather.includes('dusk')));
   const water = useRef<THREE.Group>(null!);
   const waterTime = useRef(0);
   useFrame((_, dt) => {
@@ -23,11 +24,11 @@ export function Scenery({ world, tiles, buildings }: { world: string; tiles: Til
   return <group>
     <group ref={water}>
       {scenery.lakes.map(({x,z})=><group key={`lake-${x}-${z}`} position={[x,.055,z]}>
-        <IconBuilding type="scenery_lake" night={night} fallback={null} />
+        <BuildingModel type="scenery_lake" night={night} />
       </group>)}
     </group>
     {scenery.grass.map(({x,z})=>{return <group key={`grass-${x}-${z}`} position={[x+(noise(x,z,41)-.5)*.4,.08,z+(noise(x,z,43)-.5)*.4]} rotation={[0,noise(x,z,29)*Math.PI,0]}>
-      <IconBuilding type="scenery_grass" night={night} fallback={null} />
+      <BuildingModel type="scenery_grass" night={night} />
     </group>;})}
   </group>;
 }

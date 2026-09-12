@@ -1,0 +1,59 @@
+.logistics-panel {
+  padding: 14px 0;
+  margin: 12px 0;
+  border-top: 1px solid #bac7ac;
+}
+.logistics-panel h3 {
+  font-size: 14px;
+  color: #476047;
+  margin: 0 0 12px;
+}
+.logistics-panel p,
+.logistics-panel label {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #617455;
+}
+.logistics-panel article {
+  margin: 12px 0;
+  padding: 12px;
+  background: #edf0e1;
+  border: 1px solid #d1dbc4;
+  border-radius: 6px;
+}
+.logistics-panel article b {
+  font-size: 12px;
+}
+.logistics-panel .cargo-warning {
+  color: #916238;
+}
+.logistics-panel select {
+  padding: 6px;
+  background: #faf5e6;
+  color: #476047;
+  border: 1px solid #b9c8aa;
+  border-radius: 4px;
+  margin-left: 6px;
+  max-width: 100%;
+}
+.logistics-panel summary {
+  font-size: 12px;
+  cursor: pointer;
+  color: #48634a;
+}
+.freight-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #497a70;
+}
+.cargo-label {
+  white-space: nowrap;
+  font-size: 10px;
+  color: #785332;
+  background: #fbefcfeb;
+  border: 1px solid #c8ad79;
+  border-radius: 4px;
+  padding: 2px 5px;
+}

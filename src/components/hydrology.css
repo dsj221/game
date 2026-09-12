@@ -1,0 +1,89 @@
+.hydrology-panel {
+  margin-top: 18px;
+  border-top: 1px solid #bccbb1;
+  padding-top: 12px;
+}
+.hydrology-panel h3 {
+  font-size: 15px;
+  color: #365948;
+}
+.hydrology-panel p {
+  font-size: 12px;
+  color: #536950;
+  line-height: 1.7;
+}
+.water-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.water-stats span {
+  font-size: 11px;
+}
+.water-stats b {
+  display: block;
+  color: #316c69;
+  font-size: 15px;
+}
+.hydrology-panel button {
+  padding: 7px 10px;
+  margin: 4px 4px 4px 0;
+  font-size: 11px;
+  border: 1px solid #acbba0;
+  border-radius: 4px;
+  background: #f4eedc;
+  color: #385442;
+}
+.hydrology-panel button:disabled {
+  opacity: 0.45;
+}
+.hydrology-panel button[aria-pressed="true"] {
+  background: #376d65;
+  color: white;
+  outline: 2px solid #d6ad61;
+}
+.hydrology-panel summary {
+  cursor: pointer;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.water-map-scroll {
+  overflow: auto;
+  max-height: 280px;
+  margin: 10px 0;
+}
+.water-map {
+  display: grid;
+  gap: 2px;
+  width: max-content;
+}
+.water-map button {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #c4cba6;
+  border-radius: 2px;
+}
+.water-map button:disabled {
+  visibility: hidden;
+}
+.water-map button.river {
+  background: #6da9b4;
+  color: white;
+}
+.water-map button.wet-channel {
+  background: #89b5a5;
+}
+.water-map button.dry-channel {
+  background: #a69073;
+}
+.water-selection {
+  padding: 10px;
+  background: #f2eddf;
+}
+.gate-controls {
+  border-left: 3px solid #6e9e98;
+  padding-left: 10px;
+}

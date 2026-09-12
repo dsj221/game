@@ -15,7 +15,7 @@ export function DevelopmentPanel({onMarket}:{onMarket:()=>void}){
  const needs=(goods:Partial<Bag>)=><div className="dev-goods">{Object.entries(goods).map(([key,amount])=><button key={key} className={r.bag[key as Resource]<amount?'missing':''} onClick={()=>supply(key)} title="查看生产设施，尚未解锁时前往集市"><span>{resourceNames[key as Resource]}</span><b>{Math.floor(r.bag[key as Resource])} / {amount}</b></button>)}</div>;
  const enough=(goods:Partial<Bag>)=>Object.entries(goods).every(([key,amount])=>r.bag[key as Resource]>=amount);
  return <section className="development" aria-label="城镇发展">
-  <header className="dev-intro"><span className="eyebrow">LET YOUR TOWN BE REMEMBERED</span><h2>让远方也知道这里。</h2><p>邻里的信任，从一份准时送达的心意开始。</p><div className="dev-summary"><span><b>{d.reputation}</b> 小镇口碑</span><span><b>{d.total}</b> 已送达</span><span><b>{d.projects.length} / 5</b> 公共工程</span></div>{d.projects.includes('fair')&&<p>荣誉称号 · 远方也知道的小镇</p>}</header>
+  <header className="dev-intro"><h2>让远方也知道这里。</h2><p>邻里的信任，从一份准时送达的心意开始。公共工程竣工后，对应建筑会增建粮仓、牌楼、钟亭、花架或庆典旗帜。</p><div className="dev-summary"><span><b>{d.reputation}</b> 小镇口碑</span><span><b>{d.total}</b> 已送达</span><span><b>{d.projects.length} / 5</b> 公共工程</span></div>{d.projects.includes('fair')&&<p>荣誉称号 · 远方也知道的小镇</p>}</header>
   <div className="dev-tabs">{['每日委托','公共工程','经营方针'].map(v=><button key={v} onClick={()=>setTab(v)} aria-pressed={tab===v}>{v}</button>)}</div>
   {tab==='每日委托'?<>
    <p className="note">第 {t.day} 天 · 已交付 {delivered.length}/3。每天零点换新，不收押金、未完成不扣罚。等级越高，委托种类越丰富。</p>

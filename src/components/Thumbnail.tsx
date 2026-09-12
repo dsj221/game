@@ -12,6 +12,7 @@ export function Thumbnail({ type, modelType = type, size = 256 }: { type: string
 }
 
 function FallbackThumbnail({ type }: { type: string }) {
+  if(type === 'watermill')return <svg viewBox="0 0 100 86" className="thumbnail" aria-hidden="true"><path d="M4 58 48 37 96 59 51 83Z" fill="#76aaa5"/><path d="M19 30 44 18 67 31v33L44 75 19 61Z" fill="#eadcc0"/><path d="M13 31 37 7 73 30 47 45Z" fill="#357d7a"/><circle cx="66" cy="55" r="21" fill="#af8250" stroke="#715138" strokeWidth="5"/><circle cx="66" cy="55" r="7" fill="#715138"/><path d="M66 35v40M46 55h40M52 41l28 28M52 69l28-28" stroke="#715138" strokeWidth="3"/></svg>;
   if(roadStyles[type])return <svg viewBox="0 0 100 86" className="thumbnail" aria-hidden="true"><path d="M6 43 50 18 94 43 50 70Z" fill={roadStyles[type].color}/><path d="m6 43 44 27 44-27v7L50 77 6 50Z" fill="#7b705a"/><path d="m24 33 44 26m-26-36 44 26M24 54l44-26M40 64l44-26" stroke="#e2d4b9" strokeWidth="2"/></svg>;
   const mechanical = [
     "drill",

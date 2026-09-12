@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import type { Builder } from './modelGeometry.ts';
 import { buildingIconKeys } from '../data/buildingIcons.ts';
+import { pigments } from '../data/artDirection.ts';
 
 type V=[number,number,number];
-const wood='#ad631f',goldWood='#c98530',darkWood='#633812',iron='#505f70',stone='#899196',mortar='#596369',leaf='#508621',cyan='#05bddc';
+const wood=pigments.wood,goldWood=pigments.woodLight,darkWood=pigments.ink,iron='#505f70',stone=pigments.stone,mortar='#596369',leaf='#508621',cyan=pigments.water;
 export const referenceKey=(type:string)=>buildingIconKeys[type]??type.replace(/^icon_/,'');
 
 function blocks(b:Builder,w=.85,d=.75,y=.075){

@@ -4,12 +4,13 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { buildReference, referenceKey } from './referenceGeometry.ts';
 import {roadStyles} from '../data/roads.ts';
 import {detailedTree,detailedCrate} from './naturalDetails.ts';
+import { pigments } from '../data/artDirection.ts';
 
 type V = [number, number, number];
-const timber = "#a86b2d",
-  trim = "#65401e",
-  stone = "#858e91",
-  cream = "#eadbbd";
+const timber = pigments.wood,
+  trim = pigments.ink,
+  stone = pigments.stone,
+  cream = pigments.paper;
 export const modelKinds = [
   "house",
   "orchard","tea_house","library","pottery",
@@ -26,6 +27,7 @@ export const modelKinds = [
   "slime",
   "drill",
   "generator",
+  "watermill",
   "windmill",
   "farm",
   "lumber",
@@ -303,6 +305,13 @@ export function getModelGeometry(type: string): ModelGeometry {
     throw new Error(`Missing 3D building model: ${type}`);
   const b = new Builder();
   if (!buildReference(key, b)) switch (kind) {
+    case "watermill":
+      b.box([0,.05,0],[.88,.1,.88],stone);
+      b.box([-.19,.3,-.1],[.4,.48,.6],cream);
+      b.roof(.54,.8,.72,pigments.tile);
+      b.box([.2,.3,0],[.08,.5,.08],timber);
+      b.cylinder([.21,.38,.04],.04,.42,trim,[Math.PI/2,0,0]);
+      break;
     case "house":
     case "residence":
     case "apartment":

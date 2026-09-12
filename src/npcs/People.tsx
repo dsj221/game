@@ -5,6 +5,8 @@ import { Box } from "../buildings/Model";
 import type { Npc, Building } from "../types";
 import { useNpcStore,useUIStore,useWorldStore } from "../stores";
 import {navigationGrid,entrances,findRoute,type Point} from "./navigation";
+import { useTownStore } from '../stores/useTownStore';
+import { seasons, seasonIndex, pigments } from '../data/artDirection';
 export function Person({npc,buildings,speed}:{npc:Npc;buildings:Building[];speed:number}) {
  const ref=useRef<THREE.Group>(null!);
  const tiles=useWorldStore(s=>s.tiles[npc.world]);
@@ -55,14 +57,17 @@ export function PersonModel({
   kind?: string;
   variant?: number;
 }) {
+  const season = useTownStore(s => seasonIndex(s.day));
   const c =
     kind === "copper"
       ? "#b98155"
       : kind === "iron"
         ? "#c5cec0"
-        : ["#668795", "#b28564", "#83966e", "#8e7a8e"][variant % 4];
+        : seasons[season].coat[Math.abs(variant) % 4];
   return (
     <group>
+      {kind === 'villager' && season === 3 && <Box p={[0,.52,.035]} s={[.23,.07,.19]} c={pigments.brick}/>}
+      {kind === 'villager' && season === 1 && <Box p={[0,.745,0]} s={[.34,.025,.31]} c={pigments.woodLight}/>}
       <Box p={[0, 0.41, 0]} s={[0.18, 0.23, 0.13]} c={c} />
       <Box
         p={[0, 0.63, 0]}

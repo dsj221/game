@@ -1,3 +1,4 @@
+import { forecast, seasonAt, seasonDay, seasonNames } from '../systems/climate';
 import {
   Coins,
   Users,
@@ -23,6 +24,7 @@ import {
   Gift,
   ArrowRight,
   Lock,
+  Trophy,
 } from "lucide-react";
 import { useTownStore as T } from "../stores/useTownStore";
 import {
@@ -35,7 +37,13 @@ import {
 } from "../stores";
 import { quests, townLevels } from "../data/town";
 import { questProgress } from "../game/TownSimulation";
-import { beginBuild, claimQuest, panel, studioAction, goToQuest } from "../game/actions";
+import {
+  beginBuild,
+  claimQuest,
+  panel,
+  studioAction,
+  goToQuest,
+} from "../game/actions";
 import { save } from "../systems/persistence";
 import { format } from "../utils/format";
 export function TopHUD() {
@@ -67,7 +75,11 @@ export function TopHUD() {
         </b>
         <small>慢慢来，日子还长</small>
       </button>
-      <button className="hud-pill coins primary" onClick={()=>panel('daily')} aria-label="查看经营日报">
+      <button
+        className="hud-pill coins primary"
+        onClick={() => panel("daily")}
+        aria-label="查看经营日报"
+      >
         <Coins size={20} />
         <div>
           <b data-testid="currency">{format(r.currency)}</b>
@@ -109,7 +121,33 @@ export function TopHUD() {
         <small>{townLevels[t.level - 1].name}</small>
       </button>
       <div className="top-actions">
-        <select aria-label="地图信息模式" value={U(s=>s.mapMode)} onChange={e=>U.setState({mapMode:e.target.value as ReturnType<typeof U.getState>['mapMode']})}>{Object.entries({none:'地图视图',happiness:'幸福度',commerce:'商业覆盖',jobs:'就业覆盖',food:'食品覆盖',health:'医疗覆盖',environment:'环境',roads:'道路覆盖',value:'土地价值'}).map(([id,name])=><option key={id} value={id}>{name}</option>)}</select>
+        <select
+          aria-label="地图信息模式"
+          value={U((s) => s.mapMode)}
+          onChange={(e) =>
+            U.setState({
+              mapMode: e.target.value as ReturnType<
+                typeof U.getState
+              >["mapMode"],
+            })
+          }
+        >
+          {Object.entries({
+            none: "地图视图",
+            happiness: "幸福度",
+            commerce: "商业覆盖",
+            jobs: "就业覆盖",
+            food: "食品覆盖",
+            health: "医疗覆盖",
+            environment: "环境",
+            roads: "道路覆盖",
+            value: "土地价值",
+          }).map(([id, name]) => (
+            <option key={id} value={id}>
+              {name}
+            </option>
+          ))}
+        </select>
         <button
           className="icon-button"
           aria-label={s.sound ? "关闭声音" : "开启声音"}
@@ -198,7 +236,12 @@ export function BuildMenu() {
               >
                 <Icon size={20} />
                 <span>{name}</span>
-                <kbd title={`键盘快捷键 ${i + 1}`} aria-label={`快捷键 ${i + 1}`}>按 {i + 1}</kbd>
+                <kbd
+                  title={`键盘快捷键 ${i + 1}`}
+                  aria-label={`快捷键 ${i + 1}`}
+                >
+                  按 {i + 1}
+                </kbd>
               </button>
             ))}
       </nav>
@@ -226,6 +269,13 @@ export function BuildMenu() {
         >
           <Newspaper size={19} />
         </button>
+        <button
+          title="街区手记"
+          aria-label="街区手记"
+          onClick={() => panel("book")}
+        >
+          <Trophy size={19} />
+        </button>
       </div>
     </footer>
   );
@@ -234,15 +284,15 @@ export function TownGoal() {
   const t = T(),
     b = B((s) => s.buildings),
     q =
-      quests.find((q) => q.stage<=t.level&&!t.claimed.includes(q.id)) ||
+      quests.find((q) => q.stage <= t.level && !t.claimed.includes(q.id)) ||
       quests[quests.length - 1],
     ready = t.completed.includes(q.id) && !t.claimed.includes(q.id);
   const progress = Math.min(q.count, questProgress(t, b, q.id));
   return (
-    <div
-      className={`next-goal town-goal ${ready ? "ready" : ""}`}
-    >
-      <button className="wishes-heading" onClick={()=>panel('quests')}>邻里愿望 · 查看全部 <ChevronRight size={15}/></button>
+    <div className={`next-goal town-goal ${ready ? "ready" : ""}`}>
+      <button className="wishes-heading" onClick={() => panel("quests")}>
+        邻里愿望 · 查看全部 <ChevronRight size={15} />
+      </button>
       <span>
         {ready ? "一个心愿，已经实现" : "下一件小小的事"}
         {ready ? <Gift size={15} /> : <ChevronRight size={15} />}
@@ -256,7 +306,12 @@ export function TownGoal() {
         {progress} / {q.count}
         <em>{ready ? "点击领取" : "直接前往完成"}</em>
       </span>
-      <button className="wish-direct" onClick={()=>ready?claimQuest(q.id):goToQuest(q.id)}>{ready?'领取奖励':'前往当前任务'} <ArrowRight size={13}/></button>
+      <button
+        className="wish-direct"
+        onClick={() => (ready ? claimQuest(q.id) : goToQuest(q.id))}
+      >
+        {ready ? "领取奖励" : "前往当前任务"} <ArrowRight size={13} />
+      </button>
     </div>
   );
 }
@@ -264,6 +319,7 @@ export function TownNews() {
   const t = T();
   return (
     <div className="town-news">
+      <button onClick={() => panel("daily")}><b>{seasonNames[seasonAt(t.day)]} · {seasonDay(t.day)}/14 天</b><small>{forecast(t.day).map(e=>e.title+' · '+(e.startDay-t.day)+' 天后').join(' / ') || '天气与地块 · 查看准备事项'}</small></button>
       {t.legacy && (
         <button onClick={() => U.setState({ modal: "settings" })}>
           原有世界已接入经营规则 · 设置中可开始全新聚落
@@ -279,12 +335,7 @@ export function TownNews() {
           <span>
             <b>{e.title}</b>
             <small>
-              {e.type === "rain"
-                ? "农业产量 −20%"
-                : e.type === "festival"
-                  ? "庆典消费 +30%"
-                  : "诊所可减轻影响"}{" "}
-              · {e.remaining} 秒
+              {e.description} · 剩余 {(e.remaining / 360).toFixed(1)} 天
             </small>
           </span>
           <ChevronRight size={14} />

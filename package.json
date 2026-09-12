@@ -11,7 +11,10 @@
     "test:browser": "node tests/town-browser.mjs",
     "test:settings": "node tests/settings.mjs",
     "format": "prettier --write src tests",
-    "test:management": "node tests/management.mjs"
+    "test:management": "node tests/management.mjs",
+    "test:reactions": "node tests/spatial-reactions-browser.mjs",
+    "test:wishes": "node tests/resident-wishes-browser.mjs",
+    "test:resources": "node tests/resource-specialization-browser.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.0.0",

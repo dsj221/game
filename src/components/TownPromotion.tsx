@@ -11,5 +11,5 @@ export function TownProgress(){
 export function TownPromotion(){
  const t=T(),[dismissed,setDismissed]=useState(0),next=townLevels[t.level];
  if(!t.upgradeReady||!next||dismissed===next.level)return null;
- return <div className="promotion-backdrop"><section className="promotion-dialog" role="dialog" aria-modal="true" aria-label="小镇可以升级了"><span className="eyebrow">A NEW CHAPTER</span><h2>小镇可以升级了！</h2><p>邻居们一起把日子过得更好了，准备迎接{next.name}。</p><TownProgress/><button className="text-button" onClick={()=>setDismissed(next.level)}>稍后再说（邻里愿望中可继续升级）</button></section></div>;
+ return <div className="promotion-backdrop"><section className="promotion-dialog" role="dialog" aria-modal="true" aria-label="小镇可以升级了"><h2>小镇可以升级了！</h2><p>邻居们一起把日子过得更好了，准备迎接{next.name}。</p><TownProgress/><button className="text-button" onClick={()=>setDismissed(next.level)}>稍后再说（邻里愿望中可继续升级）</button></section></div>;
 }

@@ -1,3 +1,5 @@
+import { LogisticsPanel } from './LogisticsPanel';
+import { ClimatePanel } from './ClimatePanel';
 import { useState } from "react";
 import {
   ArrowRight,
@@ -40,10 +42,10 @@ import {
   priceOf,
 } from "../game/actions";
 import { format } from "../utils/format";
-import {TownProgress} from './TownPromotion';
-import {ManagementDesk,LiveChains} from './ManagementDesk';
-import {DevelopmentPanel} from './DevelopmentPanel';
-import {developmentBonuses} from '../systems/development';
+import { TownProgress } from "./TownPromotion";
+import { ManagementDesk, LiveChains } from "./ManagementDesk";
+import { DevelopmentPanel } from "./DevelopmentPanel";
+import { developmentBonuses } from "../systems/development";
 import type { Building, Npc, Resource } from "../types";
 export const coreResources: Resource[] = [
   "wood",
@@ -52,6 +54,8 @@ export const coreResources: Resource[] = [
   "flour",
   "bread",
   "furniture",
+  "pottery",
+  "tools",
   "stone",
 ];
 export function TownOverview() {
@@ -73,8 +77,7 @@ export function TownOverview() {
           </button>
         ))}
       </div>
-      <div className="town-postcard" hidden={tab==='发展'}>
-        <span className="eyebrow">A PLACE TO CALL HOME</span>
+      <div className="town-postcard" hidden={tab === "发展"}>
         <h2>{townLevels[t.level - 1].name}</h2>
         <p>{m.growthReason}</p>
         <div className="town-stat-grid">
@@ -100,10 +103,26 @@ export function TownOverview() {
           </div>
         </div>
       </div>
-      {tab === "发展" ? <DevelopmentPanel onMarket={()=>setTab('集市')}/> : tab === "经营" ? <><button className="dev-entry" onClick={()=>setTab('发展')}><span>小镇来信 · 城镇发展<small>每日3份委托 · 五章公共工程 · 经营方针</small></span><ArrowRight size={18}/></button><ManagementDesk onNavigate={setTab}/><LiveChains/></> : tab === "居民" ? (
+      {tab === "发展" ? (
+        <DevelopmentPanel onMarket={() => setTab("集市")} />
+      ) : tab === "经营" ? (
+        <>
+          <button className="dev-entry" onClick={() => setTab("发展")}>
+            <span>
+              小镇来信 · 城镇发展
+              <small>每日3份委托 · 五章公共工程 · 经营方针</small>
+            </span>
+            <ArrowRight size={18} />
+          </button>
+          <ManagementDesk onNavigate={setTab} />
+          <LiveChains />
+        </>
+      ) : tab === "居民" ? (
         <>
           {n
-            .filter((p) => p.modelType === "villager" && p.world === 'overworld')
+            .filter(
+              (p) => p.modelType === "villager" && p.world === "overworld",
+            )
             .map((p) => (
               <button
                 className="resident"
@@ -151,9 +170,7 @@ export function TownOverview() {
             <Wheat size={22} />
             <span>
               <b>{m.foodDays < 0.5 ? "食品供应不足" : "餐桌上的安心"}</b>
-              <small>
-                仓库与店铺食品可支持约 {m.foodDays.toFixed(1)} 天。
-              </small>
+              <small>仓库与店铺食品可支持约 {m.foodDays.toFixed(1)} 天。</small>
             </span>
           </div>
           <p className="note">
@@ -192,7 +209,7 @@ export function TownOverview() {
             居民自动寻找空缺岗位。员工不足会降低效率；暂停营业会释放岗位，并停止工资和维护支出。
           </p>
           {b
-            .filter((v) => slots(v) > 0 && v.world === 'overworld')
+            .filter((v) => slots(v) > 0 && v.world === "overworld")
             .map((v) => (
               <button
                 className="resident"
@@ -242,8 +259,10 @@ export function TradeList() {
   );
 }
 export function CitizenInfo({ n }: { n: Npc }) {
-  const development=T(s=>s.development),bonuses=developmentBonuses(development);
-  const npcs=N(s=>s.npcs),offline=B(s=>s.offline);
+  const development = T((s) => s.development),
+    bonuses = developmentBonuses(development);
+  const npcs = N((s) => s.npcs),
+    offline = B((s) => s.offline);
   const buildings = B((s) => s.buildings),
     home = buildings.find((b) => b.id === n.home),
     work = buildings.find((b) => b.id === n.workplace);
@@ -261,7 +280,25 @@ export function CitizenInfo({ n }: { n: Npc }) {
         </div>
       </div>
       <blockquote>“{n.recent || "很高兴来到这里。"}”</blockquote>
-      <div className="production-lines">{Object.entries(happinessFactors(n,buildings,defs,operationalIds(buildings,npcs,defs,offline),bonuses.happiness)).map(([name,value])=><span key={name}>{name}<b>{value>=0?'+':''}{value.toFixed(1)}</b></span>)}</div>
+      <div className="production-lines">
+        {Object.entries(
+          happinessFactors(
+            n,
+            buildings,
+            defs,
+            operationalIds(buildings, npcs, defs, offline),
+            bonuses.happiness,
+          ),
+        ).map(([name, value]) => (
+          <span key={name}>
+            {name}
+            <b>
+              {value >= 0 ? "+" : ""}
+              {value.toFixed(1)}
+            </b>
+          </span>
+        ))}
+      </div>
       <div className="town-stat-grid">
         <div>
           <b>{Math.round(n.happiness || 0)}%</b>
@@ -277,7 +314,10 @@ export function CitizenInfo({ n }: { n: Npc }) {
           ["职业", n.profession],
           ["住所", home ? defs[home.type].name : "正在寻找住所"],
           ["工作", work ? defs[work.type].name : "暂未就业"],
-          ["岗位工资", `${((n.income || 0)*bonuses.wages).toFixed(1)} 金币 / 天`],
+          [
+            "岗位工资",
+            `${((n.income || 0) * bonuses.wages).toFixed(1)} 金币 / 天`,
+          ],
           ["家庭汇款", "24 金币 / 天（居民钱包）"],
           ["随身钱包", `${(n.wallet || 0).toFixed(1)} 金币`],
           ["现在", n.state || "邻里散步"],
@@ -289,6 +329,40 @@ export function CitizenInfo({ n }: { n: Npc }) {
           </span>
         ))}
       </div>
+      {n.wish && (
+        <section className="resident-wish-card" aria-label="个人愿望">
+          <span className="eyebrow">
+            个人愿望 · 第 {n.wish.deadlineDay} 天前
+          </span>
+          <h3>{n.wish.title}</h3>
+          <p>{n.wish.story}</p>
+          <small>可以任选一种回应：</small>
+          <ol>
+            {n.wish.solutions.map((solution) => (
+              <li key={solution}>{solution}</li>
+            ))}
+          </ol>
+        </section>
+      )}
+      {!!n.memories?.length && (
+        <section className="resident-memories" aria-label="居民记忆">
+          <div className="section-title">留下的记忆</div>
+          {n.memories
+            .slice(-3)
+            .reverse()
+            .map((memory) => (
+              <p key={memory.id} className={memory.outcome}>
+                <b>{memory.title}</b>
+                <span>{memory.text}</span>
+                <small>
+                  第 {memory.day} 天 · 幸福长期影响{" "}
+                  {memory.happiness > 0 ? "+" : ""}
+                  {memory.happiness.toFixed(2)}
+                </small>
+              </p>
+            ))}
+        </section>
+      )}
       <div className="section-title">
         生活需求 <span>越满，越希望被满足</span>
       </div>
@@ -318,8 +392,8 @@ export function CitizenInfo({ n }: { n: Npc }) {
   );
 }
 export function FacilityInfo({ b }: { b: Building }) {
-  const allBuildings=B(s=>s.buildings);
-  const offline=B(s=>s.offline);
+  const allBuildings = B((s) => s.buildings);
+  const offline = B((s) => s.offline);
   const t = T(),
     n = N((s) => s.npcs),
     resources = R(),
@@ -327,7 +401,7 @@ export function FacilityInfo({ b }: { b: Building }) {
     c = defs[b.type].town,
     f = t.facilities[b.id] || emptyFacility();
   if (!c) return null;
-  const bonuses=developmentBonuses(t.development);
+  const bonuses = developmentBonuses(t.development);
   const residents = n.filter((n) => n.home === b.id),
     workers = n.filter((n) => n.workplace === b.id);
   return (
@@ -339,15 +413,35 @@ export function FacilityInfo({ b }: { b: Building }) {
         {b.paused ? "已暂停营业" : f.status}
         {c.jobs > 0 && (
           <span>
-            {workers.length} / {slots(b)} 已分配 · {workers.filter(n=>n.arrivedAt===b.id).length} 人到岗
+            {workers.length} / {slots(b)} 已分配 ·{" "}
+            {workers.filter((n) => n.arrivedAt === b.id).length} 人到岗
           </span>
         )}
       </div>
       <OperatingEffects building={b} />
-      {c.jobs>0&&<WorkSchedule id={b.id} facility={f} shop={!!c.sells}/>}
+      {c.jobs > 0 && <WorkSchedule id={b.id} facility={f} shop={!!c.sells} />}
       {c.capacity ? (
         <>
-          <div className="production-lines">{residents[0]&&Object.entries(happinessFactors(residents[0],allBuildings,defs,operationalIds(allBuildings,n,defs,offline),bonuses.happiness)).map(([name,value])=><span key={name}>{name}<b>{value>=0?'+':''}{value.toFixed(1)}</b></span>)}</div>
+          <div className="production-lines">
+            {residents[0] &&
+              Object.entries(
+                happinessFactors(
+                  residents[0],
+                  allBuildings,
+                  defs,
+                  operationalIds(allBuildings, n, defs, offline),
+                  bonuses.happiness,
+                ),
+              ).map(([name, value]) => (
+                <span key={name}>
+                  {name}
+                  <b>
+                    {value >= 0 ? "+" : ""}
+                    {value.toFixed(1)}
+                  </b>
+                </span>
+              ))}
+          </div>
           <div className="town-stat-grid">
             <div>
               <b>
@@ -430,7 +524,6 @@ export function FacilityInfo({ b }: { b: Building }) {
       ) : c.output ? (
         <>
           <div className="recipe-card">
-            <span className="eyebrow">FROM THE FIELD TO YOUR TABLE</span>
             <h3>
               {c.recipe
                 ? Object.entries(c.recipe)
@@ -440,7 +533,8 @@ export function FacilityInfo({ b }: { b: Building }) {
               <ArrowRight size={16} />{" "}
               {Object.entries(c.output)
                 .map(
-                  ([r, v]) => `${resourceNames[r as Resource]} ×${Number((v * b.level * (['food','wheat'].includes(r)?bonuses.food:1)).toFixed(1))}`,
+                  ([r, v]) =>
+                    `${resourceNames[r as Resource]} ×${Number((v * b.level * (["food", "wheat"].includes(r) ? bonuses.food : 1)).toFixed(1))}`,
                 )
                 .join(" + ")}
             </h3>
@@ -474,7 +568,7 @@ export function FacilityInfo({ b }: { b: Building }) {
             <small>今日实际经营成本</small>
           </div>
           <div>
-            <b>+{b.paused?0:(c.environment || 0)*b.level}</b>
+            <b>+{b.paused ? 0 : (c.environment || 0) * b.level}</b>
             <small>环境评分（主世界统计）</small>
           </div>
         </div>
@@ -494,7 +588,9 @@ export function FacilityInfo({ b }: { b: Building }) {
               <span>
                 {p.name} · {p.profession}
               </span>
-              <span className="resident-state">{((p.income||0)*bonuses.wages).toFixed(1)} / 天</span>
+              <span className="resident-state">
+                {((p.income || 0) * bonuses.wages).toFixed(1)} / 天
+              </span>
             </button>
           ))}
           {!workers.length && (
@@ -529,33 +625,106 @@ export function FacilityInfo({ b }: { b: Building }) {
   );
 }
 export function QuestPanel() {
- const t=T(),buildings=B(s=>s.buildings),[chapter,setChapter]=useState(0),[showDone,setShowDone]=useState(true);
- const active=U(s=>s.activeGuide);
- const chapterQuests=quests.filter(q=>chapter===0||q.stage===chapter);
- const visible=chapterQuests.filter(q=>showDone||!t.claimed.includes(q.id));
- return <>
-  <div className="panel-intro"><span className="eyebrow">GROW TOGETHER</span><h2>一步一步，住进理想生活。</h2><p>从第一间住宅到梦想之城。先完成当前阶段，建设、生产与居民生活会逐渐展开。</p></div>
-  <TownProgress />
-  <button className="text-button" onClick={()=>setChapter(0)}>全部邻里愿望（{quests.length}）</button>
-  <div className="quest-chapters">{townLevels.map(l=><button key={l.level} className={chapter===l.level?'active':''} onClick={()=>setChapter(l.level)}>Lv.{l.level}<small>{l.name}</small></button>)}</div>
-  <p className="note">{chapter>t.level?'这是未来的愿望。晋级后解锁这一章的行动。':'建议从第一项未完成愿望开始。点击按钮直接进入操作或定位建筑，无需翻找菜单。'}</p>
-  <label className="quest-history"><input type="checkbox" checked={showDone} onChange={e=>setShowDone(e.target.checked)}/>显示已领取愿望（{chapterQuests.filter(q=>t.claimed.includes(q.id)).length}）</label>
-  {!visible.length&&<p>这一章的心愿都已实现。继续满足上方小镇晋级条件吧。</p>}
-  {visible.map(q=>{const progress=Math.min(q.count,questProgress(t,buildings,q.id)),ready=t.completed.includes(q.id),claimed=t.claimed.includes(q.id);return <article key={q.id} className={`quest-card ${active===q.id?'current':''} ${claimed?'claimed':''}`}>
-   <span className="quest-icon">{ready?<Check size={20}/>:<Heart size={20}/>}</span>
-   <div><h3>{q.title}</h3><p>{q.text}</p><p className="quest-hint">{q.hint}</p>
-    <div className="quest-progress"><i style={{width:`${progress/q.count*100}%`}}/></div>
-    <small>{Math.floor(progress)} / {q.count} · 奖励 {q.reward} 金币</small>
-    <button disabled={claimed||q.stage>t.level} className={ready?'primary':'text-button'} onClick={()=>ready?claimQuest(q.id):goToQuest(q.id)}>{claimed?'心愿已实现':q.stage>t.level?`Lv.${q.stage}解锁`:ready?'领取奖励':'前往完成'} <ArrowRight size={13}/></button>
-   </div>
-  </article>})}
- </>;
+  const t = T(),
+    buildings = B((s) => s.buildings),
+    [chapter, setChapter] = useState(0),
+    [showDone, setShowDone] = useState(true);
+  const active = U((s) => s.activeGuide);
+  const chapterQuests = quests.filter(
+    (q) => chapter === 0 || q.stage === chapter,
+  );
+  const visible = chapterQuests.filter(
+    (q) => showDone || !t.claimed.includes(q.id),
+  );
+  return (
+    <>
+      <div className="panel-intro">
+        <h2>一步一步，住进理想生活。</h2>
+        <p>
+          从第一间住宅到梦想之城。先完成当前阶段，建设、生产与居民生活会逐渐展开。
+        </p>
+      </div>
+      <TownProgress />
+      <button className="text-button" onClick={() => setChapter(0)}>
+        全部邻里愿望（{quests.length}）
+      </button>
+      <div className="quest-chapters">
+        {townLevels.map((l) => (
+          <button
+            key={l.level}
+            className={chapter === l.level ? "active" : ""}
+            onClick={() => setChapter(l.level)}
+          >
+            Lv.{l.level}
+            <small>{l.name}</small>
+          </button>
+        ))}
+      </div>
+      <p className="note">
+        {chapter > t.level
+          ? "这是未来的愿望。晋级后解锁这一章的行动。"
+          : "建议从第一项未完成愿望开始。点击按钮直接进入操作或定位建筑，无需翻找菜单。"}
+      </p>
+      <label className="quest-history">
+        <input
+          type="checkbox"
+          checked={showDone}
+          onChange={(e) => setShowDone(e.target.checked)}
+        />
+        显示已领取愿望（
+        {chapterQuests.filter((q) => t.claimed.includes(q.id)).length}）
+      </label>
+      {!visible.length && (
+        <p>这一章的心愿都已实现。继续满足上方小镇晋级条件吧。</p>
+      )}
+      {visible.map((q) => {
+        const progress = Math.min(q.count, questProgress(t, buildings, q.id)),
+          ready = t.completed.includes(q.id),
+          claimed = t.claimed.includes(q.id);
+        return (
+          <article
+            key={q.id}
+            className={`quest-card ${active === q.id ? "current" : ""} ${claimed ? "claimed" : ""}`}
+          >
+            <span className="quest-icon">
+              {ready ? <Check size={20} /> : <Heart size={20} />}
+            </span>
+            <div>
+              <h3>{q.title}</h3>
+              <p>{q.text}</p>
+              <p className="quest-hint">{q.hint}</p>
+              <div className="quest-progress">
+                <i style={{ width: `${(progress / q.count) * 100}%` }} />
+              </div>
+              <small>
+                {Math.floor(progress)} / {q.count} · 奖励 {q.reward} 金币
+              </small>
+              <button
+                disabled={claimed || q.stage > t.level}
+                className={ready ? "primary" : "text-button"}
+                onClick={() => (ready ? claimQuest(q.id) : goToQuest(q.id))}
+              >
+                {claimed
+                  ? "心愿已实现"
+                  : q.stage > t.level
+                    ? `Lv.${q.stage}解锁`
+                    : ready
+                      ? "领取奖励"
+                      : "前往完成"}{" "}
+                <ArrowRight size={13} />
+              </button>
+            </div>
+          </article>
+        );
+      })}
+    </>
+  );
 }
 export function DailySummary() {
   const t = T(),
-    [selectedDay, setSelectedDay] = useState<number|null>(null),
+    [selectedDay, setSelectedDay] = useState<number | null>(null),
     previous = selectedDay !== null,
-    report = t.reports.find(r=>r.day===selectedDay),
+    report = t.reports.find((r) => r.day === selectedDay),
     l = report || t.ledger;
   return (
     <>
@@ -569,14 +738,49 @@ export function DailySummary() {
         <button
           className={previous ? "active" : ""}
           disabled={!t.reports.length}
-          onClick={() => setSelectedDay(t.reports[0]?.day??null)}
+          onClick={() => setSelectedDay(t.reports[0]?.day ?? null)}
         >
           历史结算
         </button>
       </div>
-      {t.reports.length>0&&<><div className="report-history" aria-label="历史日报">{t.reports.slice(0,7).map(r=><button key={r.day} className={selectedDay===r.day?'active':''} onClick={()=>setSelectedDay(r.day)}>第 {r.day} 天</button>)}</div><div className="report-trend" aria-label="最近七天经营利润">{t.reports.slice(0,7).reverse().map(r=><button key={r.day} className={r.profit<0?'loss':''} style={{height:`${Math.max(8,Math.abs(r.profit)/Math.max(1,...t.reports.slice(0,7).map(v=>Math.abs(v.profit)))*80)}px`}} title={`第${r.day}天：${r.profit.toFixed(1)}金币`} aria-label={`第${r.day}天经营利润${r.profit.toFixed(1)}金币`} onClick={()=>setSelectedDay(r.day)}><small>第{r.day}天</small></button>)}</div><p className="note">绿色为盈利，棕色为亏损；柱高表示金额绝对值。点击查看当天明细。</p></>}
+      {t.reports.length > 0 && (
+        <>
+          <div className="report-history" aria-label="历史日报">
+            {t.reports.slice(0, 7).map((r) => (
+              <button
+                key={r.day}
+                className={selectedDay === r.day ? "active" : ""}
+                onClick={() => setSelectedDay(r.day)}
+              >
+                第 {r.day} 天
+              </button>
+            ))}
+          </div>
+          <div className="report-trend" aria-label="最近七天经营利润">
+            {t.reports
+              .slice(0, 7)
+              .reverse()
+              .map((r) => (
+                <button
+                  key={r.day}
+                  className={r.profit < 0 ? "loss" : ""}
+                  style={{
+                    height: `${Math.max(8, (Math.abs(r.profit) / Math.max(1, ...t.reports.slice(0, 7).map((v) => Math.abs(v.profit)))) * 80)}px`,
+                  }}
+                  title={`第${r.day}天：${r.profit.toFixed(1)}金币`}
+                  aria-label={`第${r.day}天经营利润${r.profit.toFixed(1)}金币`}
+                  onClick={() => setSelectedDay(r.day)}
+                >
+                  <small>第{r.day}天</small>
+                </button>
+              ))}
+          </div>
+          <p className="note">
+            绿色为盈利，棕色为亏损；柱高表示金额绝对值。点击查看当天明细。
+          </p>
+        </>
+      )}
       <div className="town-postcard">
-        <span className="eyebrow">A DAY WORTH REMEMBERING</span>
         <h2>第 {report?.day || t.day} 天 · 块间日报</h2>
         <p>
           {report
@@ -633,16 +837,18 @@ export function DailySummary() {
             </span>
           </div>
         ))}
+      <ClimatePanel/>
+      <LogisticsPanel/>
       <div className="section-title">街巷消息</div>
       {t.events.map((e) => (
         <article className="event-card" key={e.id}>
           <b>{e.title}</b>
           <p>{e.description}</p>
           <small>
-            剩余 {e.remaining} / {e.duration} 秒
+            剩余 {(e.remaining / 360).toFixed(1)} / {e.duration / 360} 天
           </small>
           <div className="quest-progress">
-            <i style={{ width: `${e.remaining / e.duration * 100}%` }} />
+            <i style={{ width: `${(e.remaining / e.duration) * 100}%` }} />
           </div>
         </article>
       ))}
@@ -688,7 +894,12 @@ export function ProductionPanel() {
             </button>
           );
         })}
-      <button className="primary wide" onClick={() => U.setState({panel: "shop", tab: "发现", category: "生产"})}>
+      <button
+        className="primary wide"
+        onClick={() =>
+          U.setState({ panel: "shop", tab: "发现", category: "生产" })
+        }
+      >
         建造生产设施
       </button>
       <div className="section-title">仓库</div>
@@ -696,6 +907,6 @@ export function ProductionPanel() {
     </>
   );
 }
-import {happinessFactors,operationalIds} from '../systems/buildingInfluence';
-import {WorkSchedule} from './WorkSchedule';
-import {OperatingEffects} from './OperatingEffects';
+import { happinessFactors, operationalIds } from "../systems/buildingInfluence";
+import { WorkSchedule } from "./WorkSchedule";
+import { OperatingEffects } from "./OperatingEffects";

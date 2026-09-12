@@ -62,6 +62,7 @@ export function Smoke({
   return (
     <instancedMesh
       ref={ref}
+      name="working-smoke"
       args={[undefined, undefined, positions.length * 3]}
       frustumCulled={false}
     >

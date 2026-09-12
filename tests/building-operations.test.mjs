@@ -17,8 +17,8 @@ function scenario(type){
  const town=initialTown();town.minute=500;town.nextEvent=100000;
  return {town,buildings,npcs,bag:Object.fromEntries(Object.keys(emptyBag()).map(r=>[r,100])),currency:10000,tick:0,weather:[]};
 }
-test('60种建筑都有可执行经营路径，17种图鉴建筑全部补齐',()=>{
- assert.equal(Object.keys(defs).length,60);assert.equal(Object.keys(catalogOperations).length,17);
+test('61种建筑都有可执行经营路径，17种图鉴建筑全部补齐',()=>{
+ assert.equal(Object.keys(defs).length,61);assert.equal(Object.keys(catalogOperations).length,17);
  for(const d of Object.values(defs))assert.ok(isRoad(d.id)||d.town?.capacity||d.town?.output||d.town?.sells||d.power||influenceRules[d.id]||['studio','portal','endportal'].includes(d.id),d.id+'没有实际效果');
 });
 for(const d of Object.values(defs).filter(d=>d.town?.output))test(d.name+'：有工人真实生产，原料计入消耗，暂停停止产出',()=>{

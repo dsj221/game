@@ -1,3 +1,4 @@
+import { RIVER_X } from '../systems/hydrology.ts';
 import type { Building, Tile } from "../types/index.ts";
 import { buildingCells } from "../data/footprints.ts";
 import {isRoad,roadStyles} from '../data/roads.ts';
@@ -17,10 +18,10 @@ export function navigationGrid(tiles: Tile[], buildings: Building[]) {
   for (const t of tiles)
     for (let x = -1; x <= 1; x++)
       for (let z = -1; z <= 1; z++)
-        grid.set(`${t.x * 3 + x},${t.z * 3 + z}`, 2.5);
+        if(t.x * 3 + x !== RIVER_X) grid.set(`${t.x * 3 + x},${t.z * 3 + z}`, 2.5);
   for (const b of buildings)
     for (const c of buildingCells(b)) {
-      if (isRoad(b.type))
+      if (isRoad(b.type) && tiles.some(t=>Math.abs(t.x*3-c.x)<=1&&Math.abs(t.z*3-c.z)<=1))
         grid.set(key(c), roadStyles[b.type]?.weight??1);
       else grid.delete(key(c));
     }

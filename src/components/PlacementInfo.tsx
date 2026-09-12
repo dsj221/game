@@ -8,7 +8,7 @@ import {
 import { useTownStore as T } from "../stores/useTownStore";
 import { defs } from "../data/definitions";
 import { placementReport } from "../systems/placement";
-export function PlacementInfo({compact=false}:{compact?:boolean}) {
+export function PlacementInfo({ compact = false }: { compact?: boolean }) {
   const ui = U(),
     buildings = B((s) => s.buildings),
     npcs = N((s) => s.npcs),
@@ -39,8 +39,19 @@ export function PlacementInfo({compact=false}:{compact?:boolean}) {
     level,
     !!old,
   );
-  const status=p.reasons.length?`无法放置：${p.reasons.join('、')}`:'可以放置 · 点击地图确认';
-  if(compact)return <span className={`placement-info placement-summary ${p.reasons.length?'invalid':''}`} title={status} role="status">{status}</span>;
+  const status = p.reasons.length
+    ? `无法放置：${p.reasons.join("、")}`
+    : "可以放置 · 点击地图确认";
+  if (compact)
+    return (
+      <span
+        className={`placement-info placement-summary ${p.reasons.length ? "invalid" : ""}`}
+        title={status}
+        role="status"
+      >
+        {status}
+      </span>
+    );
   return (
     <div className="placement-info" aria-live="polite">
       <b>
@@ -59,6 +70,12 @@ export function PlacementInfo({compact=false}:{compact?:boolean}) {
       <span>
         收入上限约 {p.revenue.toFixed(0)} / 日（需员工、库存和消费需求）
       </span>
+      {p.reactions.length > 0 && (
+        <span className="placement-reactions">
+          将形成 {p.reactions.length} 个块间反应：
+          {p.reactions.map((reaction) => reaction.name).join("、")}
+        </span>
+      )}
       <span>
         住宅服务：商业 {p.influence.commerce ? "有" : "无"} · 医疗{" "}
         {p.influence.health ? "有" : "无"} · 环境{" "}

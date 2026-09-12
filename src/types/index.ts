@@ -1,5 +1,16 @@
 export type WorldId = "overworld" | "nether" | "end";
-export type Resource = "wood" | "stone" | "iron" | "redstone" | "food" | "wheat" | "flour" | "bread" | "furniture";
+export type Resource =
+  | "wood"
+  | "stone"
+  | "iron"
+  | "redstone"
+  | "food"
+  | "wheat"
+  | "flour"
+  | "bread"
+  | "furniture"
+  | "pottery"
+  | "tools";
 export type Bag = Record<Resource, number>;
 export interface BuildingDefinition {
   id: string;
@@ -19,7 +30,24 @@ export interface BuildingDefinition {
   unlockRequirements?: string;
   population?: number;
   materials?: Partial<Bag>;
-  town?: { category:'住宅'|'生产'|'商业'|'公共'|'道路'|'装饰'|'进阶'; jobs:number; wage:number; upkeep:number; unlock:number; cycle?:number; recipe?:Partial<Bag>; output?:Partial<Bag>; sells?:Resource; price?:number; wholesale?:number; happiness?:number; health?:number; environment?:number; rent?:number; capacity?:number };
+  town?: {
+    category: "住宅" | "生产" | "商业" | "公共" | "道路" | "装饰" | "进阶";
+    jobs: number;
+    wage: number;
+    upkeep: number;
+    unlock: number;
+    cycle?: number;
+    recipe?: Partial<Bag>;
+    output?: Partial<Bag>;
+    sells?: Resource;
+    price?: number;
+    wholesale?: number;
+    happiness?: number;
+    health?: number;
+    environment?: number;
+    rent?: number;
+    capacity?: number;
+  };
   influenceRadius?: number;
 }
 export interface Building {
@@ -32,7 +60,7 @@ export interface Building {
   rotation: number;
   level: number;
   born: number;
-  paused?:boolean;
+  paused?: boolean;
 }
 export interface Tile {
   x: number;
@@ -49,24 +77,46 @@ export interface Npc {
   modelType: string;
   workplace: string;
   phase: number;
-  age?:number;
-  family?:string;
-  home?:string;
-  income?:number;
-  wallet?:number;
-  happiness?:number;
-  health?:number;
-  needs?:{food:number;fun:number;shopping:number};
-  state?:string;
-  destination?:string;
-  likes?:string[];
-  recent?:string;
-  lastPurchase?:number;
-  position?:{x:number;z:number};
-  travelTarget?:string;
-  route?:{x:number;z:number}[];
-  arrivedAt?:string;
-  travelProgress?:number;
+  age?: number;
+  family?: string;
+  home?: string;
+  income?: number;
+  wallet?: number;
+  happiness?: number;
+  health?: number;
+  needs?: { food: number; fun: number; shopping: number };
+  state?: string;
+  destination?: string;
+  likes?: string[];
+  recent?: string;
+  lastPurchase?: number;
+  position?: { x: number; z: number };
+  travelTarget?: string;
+  route?: { x: number; z: number }[];
+  arrivedAt?: string;
+  travelProgress?: number;
+  wish?: ResidentWish;
+  wishCooldownUntil?: number;
+  memories?: ResidentMemory[];
+}
+export type ResidentWishCause =
+  "commute" | "food" | "health" | "leisure" | "shopping" | "neighbor";
+export interface ResidentWish {
+  id: string;
+  cause: ResidentWishCause;
+  title: string;
+  story: string;
+  createdDay: number;
+  deadlineDay: number;
+  solutions: string[];
+}
+export interface ResidentMemory {
+  id: string;
+  title: string;
+  text: string;
+  day: number;
+  outcome: "resolved" | "missed";
+  happiness: number;
 }
 export interface WorldDefinition {
   id: WorldId;
@@ -78,4 +128,13 @@ export interface WorldDefinition {
   ambientLight: number;
 }
 export type Panel =
-  "shop" | "village" | "industry" | "book" | "detail" | "npc" | "studio" | "quests" | "daily" | null;
+  | "shop"
+  | "village"
+  | "industry"
+  | "book"
+  | "detail"
+  | "npc"
+  | "studio"
+  | "quests"
+  | "daily"
+  | null;

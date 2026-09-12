@@ -39,7 +39,6 @@ export default function Settings() {
       >
         <header>
           <div>
-            <span className="eyebrow">MAKE YOURSELF AT HOME</span>
             <h1>{modal === "help" ? "欢迎来到块间" : "世界设置"}</h1>
           </div>
           <button
@@ -61,8 +60,11 @@ export default function Settings() {
                 ["左键拖动", "平移世界"],
                 ["右键 / Shift + 左键", "旋转世界"],
                 ["滚轮", "缩放镜头"],
-                ["点击 / 双击建筑", "详情 / 进入直播间"],
-                ["1 · 2 · 3 · 4 · 5 · 6", "住宅 · 生产 · 商业 · 公共 · 道路 · 装饰"],
+                ["点击建筑", "查看经营详情与块间关系"],
+                [
+                  "1 · 2 · 3 · 4 · 5 · 6",
+                  "住宅 · 生产 · 商业 · 公共 · 道路 · 装饰",
+                ],
                 ["R / Esc", "旋转建筑 / 取消建造"],
               ].map(([a, b]) => (
                 <div key={a}>

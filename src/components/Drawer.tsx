@@ -66,7 +66,7 @@ const labels = {
   shop: ["MAKE ROOM FOR EVERYDAY LIFE", "建造小镇"],
   village: ["MEET YOUR NEIGHBORS", "村庄"],
   industry: ["BUILT TO WORK", "工业"],
-  book: ["THE BOOK OF POSSIBILITIES", "世界蓝图"],
+  book: ["STORIES BETWEEN BLOCKS", "街区手记"],
   detail: ["A LITTLE PART OF YOUR WORLD", "设施详情"],
   npc: ["A FAMILIAR FACE", "世界居民"],
   studio: ["YOUR LITTLE STUDIO", "频道控制台"],
@@ -98,14 +98,17 @@ function Card({
 }: {
   d: BuildingDefinition;
   owned?: boolean;
-  instanceId?:string;
+  instanceId?: string;
 }) {
   const { buildings, offline, connected } = B(),
     world = W((s) => s.current),
-    currency = R((s) => s.currency);
+    currency = R((s) => s.currency),
+    furnitureStock = R((s) => s.bag.furniture);
   const found = buildings.filter((b) => b.world === world && b.type === d.id),
-    b = instanceId?found.find(v=>v.id===instanceId):found[0];
-  const price = owned && b ? upgradePrice(b) : d.cost;
+    b = instanceId ? found.find((v) => v.id === instanceId) : found[0];
+  const price = owned && b ? upgradePrice(b) : d.cost,
+    furniture =
+      owned && b && d.town?.capacity && b.level >= 2 ? b.level * 2 : 0;
   return (
     <article className="facility">
       <div className="facility-top">
@@ -114,38 +117,56 @@ function Card({
         </div>
         <div>
           <span className="eyebrow">
-            {d.category} · 占地 {d.size[0]}×{d.size[1]} {found.length > 0 && `· 已有 ${found.length}`}
+            {d.category} · 占地 {d.size[0]}×{d.size[1]}{" "}
+            {found.length > 0 && `· 已有 ${found.length}`}
           </span>
           <h3>{d.name}</h3>
           <span className="subtle">
             {owned && b
               ? `${b.level} / ${d.maxLevel} 级 · 坐标 ${b.x},${b.z} · ${offline.includes(b.id) ? "等待能源" : connected.includes(b.id) ? "道路已连接" : "未连接物流网络"}`
-              : d.power
-                ? `发电 +${d.power} E / 秒`
-                : d.energyCost
-                  ? `用电 ${d.energyCost} E / 秒`
-                  : d.town?.capacity ? `可住 ${d.town.capacity} 人 · Lv.${d.town.unlock}` : d.town?.jobs ? `${d.town.jobs} 个岗位 · Lv.${d.town.unlock} 解锁` : `Lv.${d.town?.unlock || 1} · 美好日常`}
+              : d.town?.capacity
+                ? `可住 ${d.town.capacity} 人 · Lv.${d.town.unlock}`
+                : d.town?.jobs
+                  ? `${d.town.jobs} 个岗位 · Lv.${d.town.unlock} 解锁`
+                  : d.power
+                    ? `${d.id === "watermill" ? "水力最高" : "发电 +"}${d.power} E / 秒`
+                    : d.energyCost
+                      ? `用电 ${d.energyCost} E / 秒`
+                      : `Lv.${d.town?.unlock || 1} · 美好日常`}
           </span>
         </div>
       </div>
       <p>{d.description}</p>
-      {d.town && (() => {
-        const cfg = d.town;
-        const chips = [];
-        if (cfg.capacity) chips.push(`可住${cfg.capacity}人`);
-        if (cfg.rent) chips.push(`租金${cfg.rent}/日`);
-        if (cfg.happiness) chips.push(`幸福+${cfg.happiness}`);
-        if (cfg.environment) chips.push(`环境+${cfg.environment}`);
-        if (cfg.upkeep) chips.push(`维护${cfg.upkeep}/日`);
-        if (cfg.jobs) chips.push(`${cfg.jobs}岗位·工资${cfg.wage}/日`);
-        if (cfg.cycle) chips.push(`周期${cfg.cycle}s`);
-        if (cfg.output) Object.entries(cfg.output).forEach(([r,n]) => chips.push(`产出${n}${resourceNames[r as keyof typeof resourceNames]}`));
-        if (cfg.recipe) Object.entries(cfg.recipe).forEach(([r,n]) => chips.push(`消耗${n}${resourceNames[r as keyof typeof resourceNames]}`));
-        if (cfg.sells) chips.push(`售价${cfg.price}`);
-        if (cfg.wholesale) chips.push(`进货${cfg.wholesale}`);
-        if (cfg.health) chips.push('提供医疗');
-        return chips.length ? <div className="town-chips">{chips.join(' · ')}</div> : null;
-      })()}
+      {d.town &&
+        (() => {
+          const cfg = d.town;
+          const chips = [];
+          if (cfg.capacity) chips.push(`可住${cfg.capacity}人`);
+          if (cfg.rent) chips.push(`租金${cfg.rent}/日`);
+          if (cfg.happiness) chips.push(`幸福+${cfg.happiness}`);
+          if (cfg.environment) chips.push(`环境+${cfg.environment}`);
+          if (cfg.upkeep) chips.push(`维护${cfg.upkeep}/日`);
+          if (cfg.jobs) chips.push(`${cfg.jobs}岗位·工资${cfg.wage}/日`);
+          if (cfg.cycle) chips.push(`周期${cfg.cycle}s`);
+          if (cfg.output)
+            Object.entries(cfg.output).forEach(([r, n]) =>
+              chips.push(
+                `产出${n}${resourceNames[r as keyof typeof resourceNames]}`,
+              ),
+            );
+          if (cfg.recipe)
+            Object.entries(cfg.recipe).forEach(([r, n]) =>
+              chips.push(
+                `消耗${n}${resourceNames[r as keyof typeof resourceNames]}`,
+              ),
+            );
+          if (cfg.sells) chips.push(`售价${cfg.price}`);
+          if (cfg.wholesale) chips.push(`进货${cfg.wholesale}`);
+          if (cfg.health) chips.push("提供医疗");
+          return chips.length ? (
+            <div className="town-chips">{chips.join(" · ")}</div>
+          ) : null;
+        })()}
       <div className="card-action">
         {b ? (
           <button className="text-button" onClick={() => selectBuilding(b.id)}>
@@ -163,6 +184,7 @@ function Card({
         <button
           disabled={
             currency < price ||
+            furnitureStock < furniture ||
             !unlocked(d.id) ||
             (owned && !!b && b.level >= d.maxLevel)
           }
@@ -170,27 +192,45 @@ function Card({
           onClick={() => (owned && b ? upgrade(b.id) : beginBuild(d.id))}
         >
           {!unlocked(d.id) ? <Lock size={13} /> : <Plus size={14} />}{" "}
-          {owned&&b&&b.level>=d.maxLevel?'已满级':`${format(price)} ${owned ? "升级" : "建造"}`}
+          {owned && b && b.level >= d.maxLevel
+            ? "已满级"
+            : `${format(price)} ${owned ? "升级" : "建造"}${furniture ? ` · 家具${furniture}` : ""}`}
         </button>
       </div>
     </article>
   );
 }
 function Shop() {
-  const [query,setQuery]=useState(''),[sort,setSort]=useState('默认'),[upgradeOnly,setUpgradeOnly]=useState(false);
+  const [query, setQuery] = useState(""),
+    [sort, setSort] = useState("默认"),
+    [upgradeOnly, setUpgradeOnly] = useState(false);
   const category = U((s) => s.category),
     setCategory = (category: string) => U.setState({ category });
   const tab = U((s) => s.tab) || "发现",
     world = W((s) => s.current),
     tiles = W((s) => s.tiles),
     buildings = B((s) => s.buildings);
-  const local=buildings.filter(b=>b.world===world);
-  const catalog=definitions.filter(d=>(d.world==='all'||d.world===world)&&(category==='全部'||d.category===category)&&(`${d.name}${d.description}`.includes(query.trim())));
-  const ordered=[...catalog].sort((a,b)=>sort==='价格从低到高'?a.cost-b.cost:sort==='名称'?a.name.localeCompare(b.name,'zh-CN'):0);
+  const local = buildings.filter((b) => b.world === world);
+  const catalog = definitions.filter(
+    (d) =>
+      (d.world === "all" || d.world === world) &&
+      (category === "全部" || d.category === category) &&
+      `${d.name}${d.description}`.includes(query.trim()),
+  );
+  const ordered = [...catalog].sort((a, b) =>
+    sort === "价格从低到高"
+      ? a.cost - b.cost
+      : sort === "名称"
+        ? a.name.localeCompare(b.name, "zh-CN")
+        : 0,
+  );
   return (
     <>
       <Tabs items={["发现", "已购买", "扩地+"]} />
-      <p className="note">当前世界已有 {local.length} 座设施 · {local.filter(b=>b.level<defs[b.type].maxLevel).length} 座未满级</p>
+      <p className="note">
+        当前世界已有 {local.length} 座设施 ·{" "}
+        {local.filter((b) => b.level < defs[b.type].maxLevel).length} 座未满级
+      </p>
       {tab === "扩地+" ? (
         <>
           <div className="panel-intro">
@@ -226,7 +266,16 @@ function Shop() {
       ) : (
         <>
           <div className="filters">
-            {["全部", "住宅", "生产", "商业", "公共", "道路", "装饰", "进阶"].map((c) => (
+            {[
+              "全部",
+              "住宅",
+              "生产",
+              "商业",
+              "公共",
+              "道路",
+              "装饰",
+              "进阶",
+            ].map((c) => (
               <button
                 className={category === c ? "active" : ""}
                 key={c}
@@ -239,10 +288,54 @@ function Shop() {
           <div className="list-caption">
             慢慢建造，让世界成为你的模样。<span>{worlds[world].name}</span>
           </div>
-          <div className="catalog-tools"><input aria-label="搜索设施" placeholder="搜索名称或用途…" value={query} onChange={e=>setQuery(e.target.value)}/><select aria-label="商城排序" value={sort} onChange={e=>setSort(e.target.value)}>{['默认','价格从低到高','名称'].map(s=><option key={s}>{s}</option>)}</select></div>
-          {tab==='已购买'&&<label className="note"><input type="checkbox" checked={upgradeOnly} onChange={e=>setUpgradeOnly(e.target.checked)}/> 仅看未满级设施</label>}
-          {tab==='已购买'?ordered.flatMap(d=>local.filter(b=>b.type===d.id&&(!upgradeOnly||b.level<d.maxLevel)).map(b=><Card key={b.id} d={d} owned instanceId={b.id}/>)):ordered.map(d=><Card key={d.id} d={d}/>)}
-          {(!ordered.length||(tab==='已购买'&&!local.some(b=>ordered.some(d=>d.id===b.type)&&(!upgradeOnly||b.level<defs[b.type].maxLevel))))&&<p className="note">没有符合条件的设施，请调整搜索或分类。</p>}
+          <div className="catalog-tools">
+            <input
+              aria-label="搜索设施"
+              placeholder="搜索名称或用途…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <select
+              aria-label="商城排序"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+            >
+              {["默认", "价格从低到高", "名称"].map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          {tab === "已购买" && (
+            <label className="note">
+              <input
+                type="checkbox"
+                checked={upgradeOnly}
+                onChange={(e) => setUpgradeOnly(e.target.checked)}
+              />{" "}
+              仅看未满级设施
+            </label>
+          )}
+          {tab === "已购买"
+            ? ordered.flatMap((d) =>
+                local
+                  .filter(
+                    (b) =>
+                      b.type === d.id && (!upgradeOnly || b.level < d.maxLevel),
+                  )
+                  .map((b) => (
+                    <Card key={b.id} d={d} owned instanceId={b.id} />
+                  )),
+              )
+            : ordered.map((d) => <Card key={d.id} d={d} />)}
+          {(!ordered.length ||
+            (tab === "已购买" &&
+              !local.some(
+                (b) =>
+                  ordered.some((d) => d.id === b.type) &&
+                  (!upgradeOnly || b.level < defs[b.type].maxLevel),
+              ))) && (
+            <p className="note">没有符合条件的设施，请调整搜索或分类。</p>
+          )}
         </>
       )}
     </>
@@ -443,6 +536,7 @@ function Industry() {
 }
 function Detail() {
   const [modelFor, setModelFor] = useState<string | null>(null);
+  const furnitureStock = R((s) => s.bag.furniture);
   const state = B(),
     world = W((s) => s.current),
     b = state.buildings.find((v) => v.id === state.selected);
@@ -459,18 +553,29 @@ function Detail() {
         <span>LV. {String(b.level).padStart(2, "0")}</span>
       </div>
       {getBuildingIcon(d.id) && (
-        <button className="text-button" onClick={() => setModelFor(modelFor === b.id ? null : b.id)}>
+        <button
+          className="text-button"
+          onClick={() => setModelFor(modelFor === b.id ? null : b.id)}
+        >
           {modelFor === b.id ? "查看 3D 模型" : "查看原画图标"}
         </button>
       )}
       <span className="eyebrow">
-          {d.category} · {worlds[world].name} · 占地 {(b.footprint ?? [1, 1])[b.rotation % 2 ? 1 : 0]}×{(b.footprint ?? [1, 1])[b.rotation % 2 ? 0 : 1]}
+        {d.category} · {worlds[world].name} · 占地{" "}
+        {(b.footprint ?? [1, 1])[b.rotation % 2 ? 1 : 0]}×
+        {(b.footprint ?? [1, 1])[b.rotation % 2 ? 0 : 1]}
       </span>
-        <h2>{d.name}</h2>
-        {!b.footprint && d.size.some(size => size > 1) && <p className="subtle">旧建筑保留原占地；新建同类建筑使用 {d.size[0]}×{d.size[1]} 占地。</p>}
+      <h2>{d.name}</h2>
+      {!b.footprint && d.size.some((size) => size > 1) && (
+        <p className="subtle">
+          旧建筑保留原占地；新建同类建筑使用 {d.size[0]}×{d.size[1]} 占地。
+        </p>
+      )}
       <p className="description">{d.description}</p>
       <FacilityInfo key={b.id} b={b} />
-      <button className="secondary wide" onClick={()=>rotateBuilding(b.id)}>旋转建筑 · {b.rotation*90}°</button>
+      <button className="secondary wide" onClick={() => rotateBuilding(b.id)}>
+        旋转建筑 · {b.rotation * 90}°
+      </button>
       <button
         className="move-button"
         onClick={() =>
@@ -486,12 +591,15 @@ function Detail() {
       </button>
       <button
         className="primary wide"
-        disabled={b.level >= d.maxLevel}
+        disabled={
+          b.level >= d.maxLevel ||
+          (!!d.town?.capacity && b.level >= 2 && furnitureStock < b.level * 2)
+        }
         onClick={() => upgrade(b.id)}
       >
         {b.level >= d.maxLevel
           ? "已达最高等级"
-          : `${format(upgradePrice(b))} 金币 · 升级`}
+          : `${format(upgradePrice(b))} 金币${d.town?.capacity && b.level >= 2 ? `＋家具 ${b.level * 2}` : ""} · 升级`}
       </button>
       {b.type === "studio" && (
         <button
@@ -530,10 +638,12 @@ function Book() {
   const ids = new Set(buildings.map((b) => b.type));
   return (
     <>
-      <Tabs items={["全部", "工具", "村庄", "红石", "直播"]} />
+      <Tabs
+        items={["全部", "住宅", "生产", "商业", "公共", "道路", "装饰", "进阶"]}
+      />
       <div className="panel-intro">
-        <h2>小世界，大有可能。</h2>
-        <p>每一项发现，都来自你在世界里留下的痕迹。</p>
+        <h2>每一段街巷，都有自己的故事。</h2>
+        <p>发现建筑、形成块间反应，并记录小镇真正发生过的改变。</p>
       </div>
       <div className="list-caption">
         已发现设施
@@ -548,7 +658,7 @@ function Book() {
             className="blueprint"
             key={d.id}
             onClick={() => {
-              panel("shop", "发现");
+              U.setState({ panel: "shop", tab: "发现", category: d.category });
             }}
           >
             <span className={ids.has(d.id) ? "discovered" : "undiscovered"}>
@@ -568,7 +678,7 @@ function Book() {
           </button>
         ))}
       <div className="section-title">
-        旅途成就{" "}
+        小镇印记{" "}
         <span>
           {g.achievements.length} / {achievementDefs.length}
         </span>
@@ -599,7 +709,8 @@ function StudioPanel() {
       <Tabs items={["节目", "观众", "订单"]} />
       <div className="broadcast">
         <span>
-          <i /> {g.studioIncome>0?'正在直播的世界':'直播待机 · 等待员工到岗'}
+          <i />{" "}
+          {g.studioIncome > 0 ? "正在直播的世界" : "直播待机 · 等待员工到岗"}
         </span>
         <h2>{format(g.viewers)}</h2>
         <small>正在观看 · {worlds[W.getState().current].name}</small>
@@ -626,12 +737,7 @@ function StudioPanel() {
               <span>
                 <b>{p}</b>
                 <small>
-                  {
-                    [
-                      "主世界观众增长加成",
-                      "频道直播收入提高 10%",
-                    ][i]
-                  }
+                  {["主世界观众增长加成", "频道直播收入提高 10%"][i]}
                 </small>
               </span>
               {g.program === p && <Check size={17} />}
@@ -706,7 +812,6 @@ export default function Drawer() {
         >
           <header className="drawer-header">
             <div>
-              <span className="eyebrow">{labels[active][0]}</span>
               <h1>{labels[active][1]}</h1>
             </div>
             <button
@@ -740,7 +845,6 @@ export default function Drawer() {
           </div>
           <footer className="drawer-footer">
             <span className="small-dot" /> 世界正在生长{" "}
-            <span>KUAI–BLOCK / 01</span>
           </footer>
         </motion.aside>
       )}

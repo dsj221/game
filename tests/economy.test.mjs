@@ -30,7 +30,7 @@ test("道路必须连接集市，孤立道路不生效", () => {
   assert.ok(c.includes("f"));
   assert.ok(!c.includes("of"));
 });
-test("无道路设施产量减半，连通后恢复", () => {
+test("静态产能不再按道路乘50%，实际运输由货运系统结算", () => {
   const disconnected = computeProduction([b("f", "farm", 2, 0)], [], 480, 480);
   const linked = computeProduction(
     [b("m", "market", 0, 0), b("r", "road", 1, 0), b("f", "farm", 2, 0)],
@@ -38,7 +38,7 @@ test("无道路设施产量减半，连通后恢复", () => {
     480,
     480,
   );
-  assert.equal(disconnected.output.food, 1.5);
+  assert.equal(disconnected.output.food, 3);
   assert.equal(linked.output.food, 3);
 });
 test("能源耗尽后机器停止，建设电源后恢复", () => {

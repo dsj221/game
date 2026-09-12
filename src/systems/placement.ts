@@ -1,8 +1,10 @@
+import { waterSiteReason } from './hydrology.ts';
 import type { Building, Bag, Tile, Npc } from "../types/index.ts";
 import { defs, resourceNames } from "../data/definitions.ts";
 import { buildingCells } from "../data/footprints.ts";
 import { onLand } from "./economy.ts";
 import { influenceFor, buildingDistance } from "./buildingInfluence.ts";
+import { reactionsForBuilding } from "./spatialReactions.ts";
 export function placementReport(
   b: Building,
   buildings: Building[],
@@ -21,6 +23,8 @@ export function placementReport(
       local.flatMap((x) => buildingCells(x).map((p) => `${p.x},${p.z}`)),
     );
   const reasons: string[] = [];
+  const waterReason = waterSiteReason(b.type,b.x,b.z,tiles,b.footprint,b.rotation);
+  if(waterReason) reasons.push(waterReason);
   if (cells.some((p) => !onLand(p.x, p.z, tiles))) reasons.push("地块未解锁");
   if (cells.some((p) => occupied.has(`${p.x},${p.z}`)))
     reasons.push("土地已占用");
@@ -59,5 +63,6 @@ export function placementReport(
     upkeep: d.town?.upkeep || 0,
     wages: (d.town?.jobs || 0) * (d.town?.wage || 0),
     revenue: customers * (d.town?.price || 0),
+    reactions: reactionsForBuilding(b, all, defs),
   };
 }

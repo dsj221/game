@@ -1,3 +1,5 @@
+import { cloneLogistics, deposit } from '../systems/logistics';
+import { waterSiteReason } from '../systems/hydrology';
 import {
   useBuildingStore as B,
   useGameStore as G,
@@ -8,18 +10,30 @@ import {
   useWorldStore as W,
 } from "../stores";
 import { defs } from "../data/definitions";
-import {retiredBuildingTypes} from '../data/playable';
+import { retiredBuildingTypes } from "../data/playable";
 import { uid } from "../data/initial";
 import { useTownStore as T } from "../stores/useTownStore";
 import { simulateTown, metrics } from "./TownSimulation";
-import {validSchedule,type WorkSchedule} from '../systems/workSchedule';
-import {broadcastStep} from '../systems/broadcast';
-import {developmentAction} from '../systems/development';
-export function developTown(kind:'order'|'project'|'policy',id:string,allowFood=false){
-  const result=developmentAction(T.getState(),R.getState().bag,R.getState().currency,B.getState().buildings,{kind,id,allowFood});
-  if('error' in result)return notify(result.error);
-  T.setState(result.town);R.setState({bag:result.bag,currency:result.currency});
-  notify(result.message!);tone('build');
+import { validSchedule, type WorkSchedule } from "../systems/workSchedule";
+import { broadcastStep } from "../systems/broadcast";
+import { developmentAction } from "../systems/development";
+export function developTown(
+  kind: "order" | "project" | "policy",
+  id: string,
+  allowFood = false,
+) {
+  const result = developmentAction(
+    T.getState(),
+    R.getState().bag,
+    R.getState().currency,
+    B.getState().buildings,
+    { kind, id, allowFood },
+  );
+  if ("error" in result) return notify(result.error);
+  T.setState(result.town);
+  R.setState({ bag: result.bag, currency: result.currency });
+  notify(result.message!);
+  tone("build");
 }
 import { quests, townLevels, emptyFacility } from "../data/town";
 import {
@@ -31,13 +45,21 @@ import {
   upgradePrice,
 } from "../systems/economy";
 import { tone } from "../systems/audio";
-import {landRegions} from '../systems/land';
+import { landRegions } from "../systems/land";
 import type { Panel, Resource, WorldId } from "../types";
+import { reactionsForBuilding } from "../systems/spatialReactions";
+import { earnedTownAchievements } from "../systems/townAchievements";
 let toastTimer: ReturnType<typeof setTimeout>;
 export function tick() {
   const settings = S.getState();
   for (let i = 0; i < settings.speed; i++) {
-    const power = computeProduction(B.getState().buildings, [], R.getState().energy, 480);
+    const power = computeProduction(
+      B.getState().buildings,
+      [],
+      R.getState().energy,
+      480,
+      T.getState().hydrology,
+    );
     const result = simulateTown({
       town: T.getState(),
       buildings: B.getState().buildings,
@@ -49,15 +71,26 @@ export function tick() {
       tiles: W.getState().tiles,
       offline: power.offline,
     });
-    const broadcast = broadcastStep(result.buildings,result.town.facilities,G.getState(),true,result.tick);
+    const broadcast = broadcastStep(
+      result.buildings,
+      result.town.facilities,
+      G.getState(),
+      true,
+      result.tick,
+    );
     result.currency += broadcast.income;
     result.net += broadcast.income;
     result.town.ledger.revenue += broadcast.income;
     for (const revenue of broadcast.revenues) {
-      const facility=result.town.facilities[revenue.id];
-      facility.revenue+=revenue.amount; facility.dailyRevenue+=revenue.amount;
+      const facility = result.town.facilities[revenue.id];
+      facility.revenue += revenue.amount;
+      facility.dailyRevenue += revenue.amount;
     }
-    G.setState({viewers:broadcast.viewers,studioIncome:broadcast.income,gifts:broadcast.gifts});
+    G.setState({
+      viewers: broadcast.viewers,
+      studioIncome: broadcast.income,
+      gifts: broadcast.gifts,
+    });
     const oldNotice = T.getState().notices[0]?.id;
     T.setState(result.town);
     N.setState({ npcs: result.npcs });
@@ -71,8 +104,12 @@ export function tick() {
       totalEarned: G.getState().totalEarned + Math.max(0, result.net),
     });
     if (settings.cycle) S.setState({ hour: result.town.minute / 60 });
-    B.setState({ connected:power.connected, offline:power.offline });
-    R.setState({energy:power.energy,generation:power.generation,consumption:power.consumption});
+    B.setState({ connected: power.connected, offline: power.offline });
+    R.setState({
+      energy: power.energy,
+      generation: power.generation,
+      consumption: power.consumption,
+    });
     const latest = result.town.notices[0];
     if (
       latest &&
@@ -83,7 +120,13 @@ export function tick() {
       tone("build");
     }
     if (result.tick >= 60) achieve("idle");
-    if (R.getState().currency >= 100000) achieve("rich");
+    if (R.getState().currency >= 10000) achieve("rich");
+    for (const id of earnedTownAchievements(
+      result.town,
+      result.buildings,
+      defs,
+    ))
+      achieve(id);
   }
 }
 export function claimQuest(id: string) {
@@ -95,33 +138,107 @@ export function claimQuest(id: string) {
   notify(`愿望已完成，获得 ${q.reward} 金币`);
   tone("collect");
 }
-export function promoteTown(){
- const t=T.getState(),next=townLevels[t.level];
- const m=metrics(B.getState().buildings,N.getState().npcs,R.getState().bag,t.facilities);
- if(!next||m.population<next.population||m.happiness<(next.level>=3?70:45)||t.ledger.sales+t.reports.reduce((s,r)=>s+r.sales,0)<next.earned)return notify('晋级条件尚未全部满足');
- T.setState({level:next.level,upgradeReady:false});
- notify(`恭喜！小镇升至 Lv.${next.level} · ${next.name}`);tone('build');
+export function promoteTown() {
+  const t = T.getState(),
+    next = townLevels[t.level];
+  const m = metrics(
+    B.getState().buildings,
+    N.getState().npcs,
+    R.getState().bag,
+    t.facilities,
+  );
+  if (
+    !next ||
+    m.population < next.population ||
+    m.happiness < (next.level >= 3 ? 70 : 45) ||
+    t.ledger.sales + t.reports.reduce((s, r) => s + r.sales, 0) < next.earned
+  )
+    return notify("晋级条件尚未全部满足");
+  T.setState({ level: next.level, upgradeReady: false });
+  notify(`恭喜！小镇升至 Lv.${next.level} · ${next.name}`);
+  tone("build");
 }
-export function goToQuest(id:string){
- const q=quests.find(q=>q.id===id);if(!q)return;
- U.setState({activeGuide:id,placement:null,moving:null});
- const all=B.getState().buildings.filter(b=>b.world==='overworld');
- if(W.getState().current!=='overworld')switchWorld('overworld');
- const focus=(b:typeof all[number])=>{selectBuilding(b.id);U.setState({cameraFocus:{x:b.x,z:b.z,nonce:Date.now()}});};
- if(q.action==='town'){panel('quests');return;}
- if(q.action==='village'||q.type==='population'){panel('village');return;}
- if(q.action==='happiness'||q.type==='environment'){U.setState({mapMode:q.action==='happiness'?'happiness':'environment'});const home=all.find(b=>defs[b.type].town?.capacity);if(home)focus(home);return;}
- if(q.action==='upgrade-home'){const home=all.find(b=>defs[b.type].town?.capacity&&b.level<defs[b.type].maxLevel);if(home)focus(home);return;}
- let type=q.action;
- if(q.type==='chain')type=['farm','windmill','bakery','breadshop'].find(type=>!all.some(b=>b.type===type))||'bakery';
- const existing=all.find(b=>b.type===type);
- if(existing&&(q.type==='sales'||q.type==='produced'||q.type==='revenue'||q.type==='chain'&&['farm','windmill','bakery','breadshop'].every(type=>all.some(b=>b.type===type)))){focus(existing);return;}
- beginBuild(type);
- if(U.getState().placement!==type)return;
- const candidates=W.getState().tiles.overworld.flatMap(t=>Array.from({length:9},(_,i)=>({x:t.x*3+i%3-1,z:t.z*3+Math.floor(i/3)-1}))).sort((a,b)=>(Math.abs(a.x)+Math.abs(a.z))-(Math.abs(b.x)+Math.abs(b.z)));
- const site=candidates.find(p=>canPlace(p.x,p.z,W.getState().tiles.overworld,all,undefined,defs[type].size));
- if(site)U.setState({hover:[site.x,site.z],cameraFocus:{...site,nonce:Date.now()}});
- else notify('当前没有足够连续空地，请移动建筑或扩张土地。');
+export function goToQuest(id: string) {
+  const q = quests.find((q) => q.id === id);
+  if (!q) return;
+  U.setState({ activeGuide: id, placement: null, moving: null });
+  const all = B.getState().buildings.filter((b) => b.world === "overworld");
+  if (W.getState().current !== "overworld") switchWorld("overworld");
+  const focus = (b: (typeof all)[number]) => {
+    selectBuilding(b.id);
+    U.setState({ cameraFocus: { x: b.x, z: b.z, nonce: Date.now() } });
+  };
+  if (q.action === "town") {
+    panel("quests");
+    return;
+  }
+  if (q.action === "village" || q.type === "population") {
+    panel("village");
+    return;
+  }
+  if (q.action === "happiness" || q.type === "environment") {
+    U.setState({
+      mapMode: q.action === "happiness" ? "happiness" : "environment",
+    });
+    const home = all.find((b) => defs[b.type].town?.capacity);
+    if (home) focus(home);
+    return;
+  }
+  if (q.action === "upgrade-home") {
+    const home = all.find(
+      (b) => defs[b.type].town?.capacity && b.level < defs[b.type].maxLevel,
+    );
+    if (home) focus(home);
+    return;
+  }
+  let type = q.action;
+  if (q.type === "chain")
+    type =
+      ["farm", "windmill", "bakery", "breadshop"].find(
+        (type) => !all.some((b) => b.type === type),
+      ) || "bakery";
+  const existing = all.find((b) => b.type === type);
+  if (
+    existing &&
+    (q.type === "sales" ||
+      q.type === "produced" ||
+      q.type === "revenue" ||
+      (q.type === "chain" &&
+        ["farm", "windmill", "bakery", "breadshop"].every((type) =>
+          all.some((b) => b.type === type),
+        )))
+  ) {
+    focus(existing);
+    return;
+  }
+  beginBuild(type);
+  if (U.getState().placement !== type) return;
+  const candidates = W.getState()
+    .tiles.overworld.flatMap((t) =>
+      Array.from({ length: 9 }, (_, i) => ({
+        x: t.x * 3 + (i % 3) - 1,
+        z: t.z * 3 + Math.floor(i / 3) - 1,
+      })),
+    )
+    .sort(
+      (a, b) => Math.abs(a.x) + Math.abs(a.z) - (Math.abs(b.x) + Math.abs(b.z)),
+    );
+  const site = candidates.find((p) =>
+    !waterSiteReason(type,p.x,p.z,W.getState().tiles.overworld,defs[type].size) && canPlace(
+      p.x,
+      p.z,
+      W.getState().tiles.overworld,
+      all,
+      undefined,
+      defs[type].size,
+    ),
+  );
+  if (site)
+    U.setState({
+      hover: [site.x, site.z],
+      cameraFocus: { ...site, nonce: Date.now() },
+    });
+  else notify("当前没有足够连续空地，请移动建筑或扩张土地。");
 }
 export function removeBuilding(id: string) {
   const b = B.getState().buildings.find((b) => b.id === id);
@@ -142,10 +259,11 @@ export function removeBuilding(id: string) {
   const facilities = { ...T.getState().facilities };
   const f = facilities[id];
   const resource = defs[b.type].town?.sells;
-  if (f && resource)
-    R.setState((s) => ({
-      bag: { ...s.bag, [resource]: s.bag[resource] + f.stock },
-    }));
+  if (f && resource) {
+    const current=T.getState().logistics;
+    if(current?.stores[id]) {const l=cloneLogistics(current);const stock=l.stores[id];stock.capacity=0;deposit(stock,resource,f.stock);stock.salvage=true;T.setState({logistics:l});}
+    else R.setState(s=>({bag:{...s.bag,[resource]:s.bag[resource]+f.stock}}));
+  }
   delete facilities[id];
   T.setState({
     facilities,
@@ -180,10 +298,24 @@ export function setPrice(id: string, factor: number) {
     },
   }));
 }
-export function setWorkSchedule(id:string,schedule:WorkSchedule|undefined){
-  if(schedule&&!validSchedule(schedule)){notify('请选择不同的上下班时间');return;}
-  if(!B.getState().buildings.some(b=>b.id===id&&defs[b.type].town?.jobs))return;
-  T.setState(t=>({facilities:{...t.facilities,[id]:{...(t.facilities[id]||emptyFacility()),schedule}}}));
+export function setWorkSchedule(
+  id: string,
+  schedule: WorkSchedule | undefined,
+) {
+  if (schedule && !validSchedule(schedule)) {
+    notify("请选择不同的上下班时间");
+    return;
+  }
+  if (
+    !B.getState().buildings.some((b) => b.id === id && defs[b.type].town?.jobs)
+  )
+    return;
+  T.setState((t) => ({
+    facilities: {
+      ...t.facilities,
+      [id]: { ...(t.facilities[id] || emptyFacility()), schedule },
+    },
+  }));
 }
 export function notify(toast: string) {
   U.setState({ toast });
@@ -201,7 +333,7 @@ export function panel(panel: Panel, tab = "") {
   tone();
 }
 export function switchWorld(current: WorldId) {
-  if(current!=='overworld')return;
+  if (current !== "overworld") return;
   W.setState((s) => ({
     current,
     interior: false,
@@ -223,9 +355,19 @@ export function selectBuilding(id: string, inside = false) {
   const b = B.getState().buildings.find((b) => b.id === id);
   if (!b) return;
   B.setState({ selected: id });
-  if(W.getState().current!==b.world)W.setState({current:b.world,interior:false});
-  const [width,depth]=b.rotation%2?[(b.footprint??[1,1])[1],(b.footprint??[1,1])[0]]:(b.footprint??[1,1]);
-  U.setState({cameraFocus:{x:b.x+(width-1)/2,z:b.z+(depth-1)/2,nonce:Date.now()}});
+  if (W.getState().current !== b.world)
+    W.setState({ current: b.world, interior: false });
+  const [width, depth] =
+    b.rotation % 2
+      ? [(b.footprint ?? [1, 1])[1], (b.footprint ?? [1, 1])[0]]
+      : (b.footprint ?? [1, 1]);
+  U.setState({
+    cameraFocus: {
+      x: b.x + (width - 1) / 2,
+      z: b.z + (depth - 1) / 2,
+      nonce: Date.now(),
+    },
+  });
   if (inside && b.type === "studio") {
     W.setState({ interior: true });
     panel("studio", "节目");
@@ -242,7 +384,7 @@ export function unlocked(type: string) {
   );
 }
 export function beginBuild(type: string) {
-  if(retiredBuildingTypes.has(type))return;
+  if (retiredBuildingTypes.has(type)) return;
   if (!unlocked(type))
     return notify(
       `需要小镇 Lv.${defs[type]?.town?.unlock || 1}${defs[type]?.unlockRequirements ? `，并建设${defs[defs[type].unlockRequirements!].name}` : ""}`,
@@ -259,7 +401,13 @@ export function beginBuild(type: string) {
   notify("选择空地建造 · R 旋转 · Esc 取消");
 }
 export function cancelBuild() {
-  U.setState({ placement: null, moving: null, expand: null, hover: null, draggingBuilding: false });
+  U.setState({
+    placement: null,
+    moving: null,
+    expand: null,
+    hover: null,
+    draggingBuilding: false,
+  });
 }
 export function buildAt(x: number, z: number) {
   const ui = U.getState(),
@@ -271,13 +419,30 @@ export function buildAt(x: number, z: number) {
     if (
       edgeTiles(W.getState().tiles[world]).some(([a, b]) => a === x && b === z)
     )
-      U.setState({ expand: ui.expand?.some(([a,b]) => a === x && b === z)
-        ? ui.expand.filter(([a,b]) => a !== x || b !== z)
-        : [...(ui.expand ?? []), [x,z]] });
+      U.setState({
+        expand: ui.expand?.some(([a, b]) => a === x && b === z)
+          ? ui.expand.filter(([a, b]) => a !== x || b !== z)
+          : [...(ui.expand ?? []), [x, z]],
+      });
     return;
   }
-  const footprint = ui.moving ? (all.find(b=>b.id===ui.moving)?.footprint ?? [1,1] as [number,number]) : defs[ui.placement].size;
-  if (!canPlace(x, z, W.getState().tiles[world], local, ui.moving || undefined, footprint, ui.rotation))
+  const waterReason = waterSiteReason(ui.placement, x, z, W.getState().tiles[world], ui.moving ? all.find(b=>b.id===ui.moving)?.footprint : defs[ui.placement].size, ui.rotation);
+  if (waterReason) return notify(waterReason);
+  const footprint = ui.moving
+    ? (all.find((b) => b.id === ui.moving)?.footprint ??
+      ([1, 1] as [number, number]))
+    : defs[ui.placement].size;
+  if (
+    !canPlace(
+      x,
+      z,
+      W.getState().tiles[world],
+      local,
+      ui.moving || undefined,
+      footprint,
+      ui.rotation,
+    )
+  )
     return notify("这里已有建筑，或超出了大陆边界");
   if (ui.moving) {
     B.setState({
@@ -294,7 +459,8 @@ export function buildAt(x: number, z: number) {
   const d = defs[ui.placement],
     r = R.getState();
   if (!unlocked(d.id)) return notify("这座设施尚未解锁");
-  if (r.currency < d.cost) return notify("金币不足，按住获取金币或等待经营收入");
+  if (r.currency < d.cost)
+    return notify("金币不足，可按住获取金币，或完成委托、出售库存");
   for (const [k, v] of Object.entries(d.materials || {}))
     if (r.bag[k as Resource] < v)
       return notify(`${k === "wood" ? "木材" : "铁矿"}不足`);
@@ -319,18 +485,29 @@ export function buildAt(x: number, z: number) {
       },
     ],
   });
+  const placed = B.getState().buildings.find((building) => building.id === id)!;
+  const reactions = reactionsForBuilding(placed, B.getState().buildings, defs);
   G.setState((s) => ({ built: s.built + 1 }));
   T.setState((t) => ({
     builtCounts: { ...t.builtCounts, [d.id]: (t.builtCounts[d.id] || 0) + 1 },
     pulses: [
       ...t.pulses,
-      { id: `build-${id}`, building: id, text: `-${d.cost} 金币`, tick: G.getState().ticks },
+      {
+        id: `build-${id}`,
+        building: id,
+        text: `-${d.cost} 金币`,
+        tick: G.getState().ticks,
+      },
     ].slice(-12),
   }));
   achieve("build");
   if (["tree", "road", "farm"].includes(d.id)) achieve(d.id);
   tone("build");
-  notify(`${d.name}已建成`);
+  notify(
+    reactions.length
+      ? `${d.name}已建成 · 形成${reactions.map((reaction) => reaction.name).join("、")}`
+      : `${d.name}已建成`,
+  );
   if (!roadType(d.id) && d.id !== "tree") cancelBuild();
 }
 export function expand() {
@@ -339,13 +516,28 @@ export function expand() {
     position = U.getState().expand;
   if (!position?.length) return;
   const cost = expansionTotal(tiles[world].length, position.length);
-  if(world==='overworld')for(const [x,z] of position){const region=landRegions(tiles.overworld).find(r=>r.tiles.some(p=>p.x===x&&p.z===z));if(region&&(T.getState().level<region.level||T.getState().metrics.population<region.population))return notify(`${region.name}需要人口 ${region.population}，Lv.${region.level}`);}
+  if (world === "overworld")
+    for (const [x, z] of position) {
+      const region = landRegions(tiles.overworld).find((r) =>
+        r.tiles.some((p) => p.x === x && p.z === z),
+      );
+      if (
+        region &&
+        (T.getState().level < region.level ||
+          T.getState().metrics.population < region.population)
+      )
+        return notify(
+          `${region.name}需要人口 ${region.population}，Lv.${region.level}`,
+        );
+    }
   if (world === "overworld" && T.getState().metrics.population < 6)
     return notify("解锁南部林地需要人口达到 6");
   if (R.getState().currency < cost) return notify("金币不足");
   if (
-    new Set(position.map(p => p.join(','))).size !== position.length ||
-    !position.every(([a,b]) => edgeTiles(tiles[world]).some(([x,z]) => x === a && z === b))
+    new Set(position.map((p) => p.join(","))).size !== position.length ||
+    !position.every(([a, b]) =>
+      edgeTiles(tiles[world]).some(([x, z]) => x === a && z === b),
+    )
   )
     return;
   R.setState((s) => ({ currency: s.currency - cost }));
@@ -354,33 +546,35 @@ export function expand() {
       ...tiles,
       [world]: [
         ...tiles[world],
-        ...position.map(([x,z]) => ({ x, z, born: Date.now() })),
+        ...position.map(([x, z]) => ({ x, z, born: Date.now() })),
       ],
     },
   });
   B.setState((s) => ({
     buildings: [
       ...s.buildings,
-      ...position.flatMap(([px,pz]) => [{
-        id: uid(),
-        type: "tree",
-        world,
-        x: px * 3 - 1,
-        z: pz * 3 - 1,
-        level: 1,
-        rotation: 0,
-        born: Date.now(),
-      },
-      ...[0, 1, 2].map((i) => ({
-        id: uid(),
-        type: "road",
-        world,
-        x: px * 3 + i - 1,
-        z: pz * 3,
-        level: 1,
-        rotation: 0,
-        born: Date.now(),
-      }))]),
+      ...position.flatMap(([px, pz]) => [
+        {
+          id: uid(),
+          type: "tree",
+          world,
+          x: px * 3 - 1,
+          z: pz * 3 - 1,
+          level: 1,
+          rotation: 0,
+          born: Date.now(),
+        },
+        ...[0, 1, 2].map((i) => ({
+          id: uid(),
+          type: "road",
+          world,
+          x: px * 3 + i - 1,
+          z: pz * 3,
+          level: 1,
+          rotation: 0,
+          born: Date.now(),
+        })),
+      ]),
     ],
   }));
   cancelBuild();
@@ -388,24 +582,45 @@ export function expand() {
   notify(`已扩建 ${position.length} 块土地，共花费 ${cost} 金币`);
   tone("build");
 }
-export function unlockRegion(id:string){
- const w=W.getState(),t=T.getState(),r=R.getState();
- if(w.current!=='overworld')return;
- const region=landRegions(w.tiles.overworld).find(z=>z.id===id);
- if(!region?.tiles.length)return;
- if(t.metrics.population<region.population||t.level<region.level)return notify(`需要人口 ${region.population}，Lv.${region.level}`);
- if(r.currency<region.cost)return notify('金币不足');
- R.setState({currency:r.currency-region.cost});
- W.setState({tiles:{...w.tiles,overworld:[...w.tiles.overworld,...region.tiles.map(p=>({...p,born:Date.now()}))]}});
- notify(`${region.name}已解锁，新增 ${region.tiles.length*9} 格土地`);
+export function unlockRegion(id: string) {
+  const w = W.getState(),
+    t = T.getState(),
+    r = R.getState();
+  if (w.current !== "overworld") return;
+  const region = landRegions(w.tiles.overworld).find((z) => z.id === id);
+  if (!region?.tiles.length) return;
+  if (t.metrics.population < region.population || t.level < region.level)
+    return notify(`需要人口 ${region.population}，Lv.${region.level}`);
+  if (r.currency < region.cost) return notify("金币不足");
+  R.setState({ currency: r.currency - region.cost });
+  W.setState({
+    tiles: {
+      ...w.tiles,
+      overworld: [
+        ...w.tiles.overworld,
+        ...region.tiles.map((p) => ({ ...p, born: Date.now() })),
+      ],
+    },
+  });
+  notify(`${region.name}已解锁，新增 ${region.tiles.length * 9} 格土地`);
 }
 export function upgrade(id: string) {
   const b = B.getState().buildings.find((b) => b.id === id);
   if (!b) return;
-  const price = upgradePrice(b);
+  const price = upgradePrice(b),
+    furniture = defs[b.type].town?.capacity && b.level >= 2 ? b.level * 2 : 0,
+    resources = R.getState();
   if (b.level >= defs[b.type].maxLevel) return notify("已达到最高等级");
-  if (R.getState().currency < price) return notify("金币不足");
-  R.setState((s) => ({ currency: s.currency - price }));
+  if (resources.currency < price) return notify("金币不足");
+  if (resources.bag.furniture < furniture)
+    return notify(`住宅升级还需要 ${furniture} 份家具`);
+  R.setState({
+    currency: resources.currency - price,
+    bag: {
+      ...resources.bag,
+      furniture: resources.bag.furniture - furniture,
+    },
+  });
   B.setState((s) => ({
     buildings: s.buildings.map((v) =>
       v.id === id ? { ...v, level: v.level + 1, born: Date.now() } : v,
@@ -415,25 +630,43 @@ export function upgrade(id: string) {
   tone("build");
   notify(`${defs[b.type].name}升至 ${b.level + 1} 级`);
 }
-export function rotateBuilding(id:string){
- const b=B.getState().buildings.find(x=>x.id===id);if(!b)return;
- const rotation=(b.rotation+1)%4;
- if(!canPlace(b.x,b.z,W.getState().tiles[b.world],B.getState().buildings.filter(x=>x.world===b.world),id,b.footprint||[1,1],rotation))return notify('旋转后的占地被占用');
- B.setState(s=>({buildings:s.buildings.map(x=>x.id===id?{...x,rotation}:x)}));
+export function rotateBuilding(id: string) {
+  const b = B.getState().buildings.find((x) => x.id === id);
+  if (!b) return;
+  const rotation = (b.rotation + 1) % 4;
+  const waterReason = waterSiteReason(b.type,b.x,b.z,W.getState().tiles[b.world],b.footprint,rotation);
+  if(waterReason) return notify(waterReason);
+  if (
+    !canPlace(
+      b.x,
+      b.z,
+      W.getState().tiles[b.world],
+      B.getState().buildings.filter((x) => x.world === b.world),
+      id,
+      b.footprint || [1, 1],
+      rotation,
+    )
+  )
+    return notify("旋转后的占地被占用");
+  B.setState((s) => ({
+    buildings: s.buildings.map((x) => (x.id === id ? { ...x, rotation } : x)),
+  }));
 }
 export function collect() {
   if (S.getState().speed === 0) return;
-  const game=G.getState();
-  const gifts=game.forestGifts??Math.floor(game.collected/20);
-  const value = 1+gifts;
-  const completed=game.resonance+5>=100;
+  const game = G.getState();
+  const gifts = game.forestGifts ?? Math.floor(game.collected / 20);
+  const value = 1 + gifts;
+  const completed = game.resonance + 5 >= 100;
   R.setState((s) => ({
     currency: s.currency + value,
   }));
-  T.setState(s=>({ledger:{...s.ledger,revenue:s.ledger.revenue+value}}));
+  T.setState((s) => ({
+    ledger: { ...s.ledger, revenue: s.ledger.revenue + value },
+  }));
   G.setState((s) => ({
     resonance: (s.resonance + 5) % 100,
-    forestGifts:gifts+(completed?1:0),
+    forestGifts: gifts + (completed ? 1 : 0),
     collected: s.collected + 1,
     totalEarned: s.totalEarned + value,
     floating: [...s.floating.slice(-4), { id: Date.now(), value }],
@@ -443,7 +676,7 @@ export function collect() {
     R.setState((s) => ({
       energy: s.maxEnergy,
     }));
-    notify(`林间馈赠完成：每次获取金币 +1，之后每次获得 ${value+1} 金币`);
+    notify(`林间馈赠完成：每次获取金币 +1，之后每次获得 ${value + 1} 金币`);
     tone("build");
   } else tone("collect");
 }
@@ -498,6 +731,8 @@ export const priceOf = (resource: Resource) =>
     flour: 4,
     bread: 7,
     furniture: 15,
+    pottery: 12,
+    tools: 18,
   })[resource] *
   (1 +
     0.15 *
@@ -522,7 +757,8 @@ export function setProgram(program: string) {
   tone();
 }
 export function studioAction(action: string) {
-  if (!B.getState().buildings.some(b=>b.type==='studio' && !b.paused)) return notify('请先建设并开放直播间');
+  if (!B.getState().buildings.some((b) => b.type === "studio" && !b.paused))
+    return notify("请先建设并开放直播间");
   const s = G.getState(),
     r = R.getState();
   if (action === "收礼") {

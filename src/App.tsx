@@ -1,5 +1,5 @@
 import { Component, type ReactNode } from "react";
-import {daylight} from './systems/daylight';
+import { daylight } from "./systems/daylight";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -11,7 +11,7 @@ import {
   HelpCircle,
   Leaf,
   MousePointer2,
-  Coins,
+  Sparkles,
   Plus,
   RotateCcw,
   Save,
@@ -26,6 +26,7 @@ import {
   Zap,
   Factory,
   CloudRain,
+  Coins,
   Package,
 } from "lucide-react";
 import World from "./world/World";
@@ -51,18 +52,21 @@ import {
   panel,
   studioAction,
   switchWorld,
+  selectBuilding,
 } from "./game/actions";
 import { worlds, defs } from "./data/definitions";
 import { influenceFor } from "./systems/buildingInfluence";
-import { PlacementInfo } from './components/PlacementInfo';
-import {PlacementBar} from './components/PlacementBar';
-import { LandRegions } from './components/LandRegions';
-import {TownPromotion} from './components/TownPromotion';
-import {quests} from './data/town';
+import { PlacementInfo } from "./components/PlacementInfo";
+import { PlacementBar } from "./components/PlacementBar";
+import { LandRegions } from "./components/LandRegions";
+import { TownPromotion } from "./components/TownPromotion";
+import { quests } from "./data/town";
 import { expansionPrice, expansionTotal } from "./systems/economy";
 import { save, exportSave } from "./systems/persistence";
 import { format } from "./utils/format";
 import type { WorldId } from "./types";
+import { spatialReactions } from "./systems/spatialReactions";
+import { seasons, seasonIndex } from './data/artDirection';
 class RenderBoundary extends Component<
   { children: ReactNode },
   { error: boolean }
@@ -86,19 +90,25 @@ class RenderBoundary extends Component<
 }
 export default function App() {
   useGameLoop();
+  const season = T(state => seasons[seasonIndex(state.day)].name);
   const r = R(),
     w = W(),
-    g = G(),
     s = S(),
     ui = U(),
     b = B(),
-    n = N();
+    n = N(),
+    g = G();
   const local = b.buildings.filter(
     (v) => v.world === w.current && v.type !== "road",
   );
+  const blockReactions = spatialReactions(
+    b.buildings.filter((building) => building.world === w.current),
+    defs,
+  );
+  const featuredReaction = blockReactions.at(-1);
   const dark =
     w.current !== "overworld" ||
-    daylight(s.hour,s.weather.includes('dusk')) < .5;
+    daylight(s.hour, s.weather.includes("dusk")) < 0.5;
   const title = w.interior
     ? "我的直播间"
     : w.current === "overworld"
@@ -134,7 +144,7 @@ export default function App() {
                   <ArrowLeft size={15} /> 返回世界
                 </button>
               ) : (
-                (['overworld'] as WorldId[]).map((id, i) => (
+                (["overworld"] as WorldId[]).map((id, i) => (
                   <button
                     className={w.current === id ? "active" : ""}
                     key={id}
@@ -153,11 +163,6 @@ export default function App() {
               )}
             </div>
             <div className="world-title">
-              <span className="eyebrow">
-                {w.interior
-                  ? "BLOCKCAST · ON AIR"
-                  : "A LITTLE WORLD, A LITTLE WONDER"}
-              </span>
               <h1>{title}</h1>
               <p>
                 {w.interior
@@ -172,7 +177,7 @@ export default function App() {
             <span className="small-dot" />{" "}
             {w.interior
               ? "频道正在直播"
-              : `${worlds[w.current].name} · 第 ${T.getState().day} 天`}
+              : `${season} · 第 ${T.getState().day} 天`}
             <span>
               {s.weather.includes("rain") ? (
                 <CloudRain size={14} />
@@ -232,16 +237,19 @@ export default function App() {
               </div>
               <button
                 className={`collect-button ${ui.collecting ? "collecting" : ""}`}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.currentTarget.setPointerCapture(e.pointerId);
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.currentTarget.setPointerCapture(event.pointerId);
                   U.setState({ collecting: true });
                 }}
                 onPointerUp={() => U.setState({ collecting: false })}
                 onPointerCancel={() => U.setState({ collecting: false })}
-                onKeyDown={(e) => {
-                  if ((e.key === " " || e.key === "Enter") && !e.repeat) {
-                    e.preventDefault();
+                onKeyDown={(event) => {
+                  if (
+                    (event.key === " " || event.key === "Enter") &&
+                    !event.repeat
+                  ) {
+                    event.preventDefault();
                     U.setState({ collecting: true });
                   }
                 }}
@@ -250,14 +258,62 @@ export default function App() {
               >
                 <Coins size={21} />
                 <b>获取金币</b>
-                <span>+{1+(g.forestGifts??Math.floor(g.collected/20))} 金币</span>
+                <span>
+                  +{1 + (g.forestGifts ?? Math.floor(g.collected / 20))} 金币
+                </span>
                 <small>按住</small>
               </button>
-              <span className="collect-hint">每完成一次林间馈赠，单次获取金币永久 +1。</span>
+              <span className="collect-hint">
+                每完成一次林间馈赠，单次获取金币永久 +1。
+              </span>
             </div>
           )}
-          {ui.placement&&ui.placement!=='expand'&&<PlacementBar key={`${ui.placement}:${ui.moving||'new'}`}/>}
-          {ui.placement==='expand' && (
+          {!w.interior && !ui.placement && (
+            <section
+              className={`block-story ${featuredReaction ? "discovered" : "empty"}`}
+              aria-label="块间手记"
+            >
+              <span className="eyebrow">
+                <Sparkles size={13} /> 块间手记 · {blockReactions.length}
+              </span>
+              {featuredReaction ? (
+                <>
+                  <b>{featuredReaction.name}</b>
+                  <small>{featuredReaction.description}</small>
+                  <button
+                    onClick={() => {
+                      const building = b.buildings.find(
+                        (item) => item.id === featuredReaction.buildingA,
+                      );
+                      if (!building) return;
+                      selectBuilding(building.id);
+                      U.setState({
+                        cameraFocus: {
+                          x: building.x,
+                          z: building.z,
+                          nonce: Date.now(),
+                        },
+                      });
+                    }}
+                  >
+                    查看这段街巷
+                  </button>
+                </>
+              ) : (
+                <>
+                  <b>让建筑共享一条边</b>
+                  <small>试试把麦田贴近磨坊，或让住宅挨着绿地。</small>
+                  <button onClick={() => panel("shop")}>
+                    开始规划第一个街区
+                  </button>
+                </>
+              )}
+            </section>
+          )}
+          {ui.placement && ui.placement !== "expand" && (
+            <PlacementBar key={`${ui.placement}:${ui.moving || "new"}`} />
+          )}
+          {ui.placement === "expand" && (
             <div className="build-toolbar">
               <div>
                 <LandRegions />
@@ -270,14 +326,27 @@ export default function App() {
                 </b>
                 <small>
                   {ui.placement === "expand"
-                    ? ui.expand?.length ? `已选 ${ui.expand.length} 块 · 合计 ${format(expansionTotal(w.tiles[w.current].length, ui.expand.length))} 金币` : `南部林地 · 人口 ≥ 6 · 首块 ${format(expansionPrice(w.tiles[w.current].length))} 金币`
+                    ? ui.expand?.length
+                      ? `已选 ${ui.expand.length} 块 · 合计 ${format(expansionTotal(w.tiles[w.current].length, ui.expand.length))} 金币`
+                      : `南部林地 · 人口 ≥ 6 · 首块 ${format(expansionPrice(w.tiles[w.current].length))} 金币`
                     : `R 旋转 · 方向 ${ui.rotation * 90}° · Esc 取消`}
                 </small>
                 <PlacementInfo />
-                {ui.activeGuide&&<p className="active-guide">{quests.find(q=>q.id===ui.activeGuide)?.hint}</p>}
+                {ui.activeGuide && (
+                  <p className="active-guide">
+                    {quests.find((q) => q.id === ui.activeGuide)?.hint}
+                  </p>
+                )}
               </div>
               {!!ui.expand?.length && (
-                <button className="primary" onClick={expand} disabled={r.currency < expansionTotal(w.tiles[w.current].length, ui.expand.length)}>
+                <button
+                  className="primary"
+                  onClick={expand}
+                  disabled={
+                    r.currency <
+                    expansionTotal(w.tiles[w.current].length, ui.expand.length)
+                  }
+                >
                   确认扩建 {ui.expand.length} 块
                 </button>
               )}
@@ -286,13 +355,22 @@ export default function App() {
               </button>
             </div>
           )}
-          {ui.mapMode!=='none'&&!ui.placement&&<div className="map-legend">绿色：良好 · 黄色：一般 · 红色：不足<br/>幸福度仅显示已入住住宅；点击住宅查看原因。土地价值为服务覆盖指数。</div>}
+          {ui.mapMode !== "none" && !ui.placement && (
+            <div className="map-legend">
+              绿色：良好 · 黄色：一般 · 红色：不足
+              <br />
+              幸福度仅显示已入住住宅；点击住宅查看原因。土地价值为服务覆盖指数。
+            </div>
+          )}
         </section>
         <Drawer />
       </main>
       <BuildMenu />
       {ui.toast && (
-        <div className={`toast ${ui.placement?'placement-toast':''}`} role="status">
+        <div
+          className={`toast ${ui.placement ? "placement-toast" : ""}`}
+          role="status"
+        >
           <Check size={16} />
           {ui.toast}
         </div>

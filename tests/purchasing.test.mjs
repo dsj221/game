@@ -22,6 +22,7 @@ test('自定义夜班真实成交，班外停止并保留排班数据',()=>{
 });
 function scenario(minute=480){
  const buildings=[{id:'home',type:'house',x:-2,z:0},{id:'shop',type:'shop',x:1,z:0}].map(b=>({...b,world:'overworld',level:1,rotation:0,born:0}));
+ buildings.push({id:'warehouse',type:'warehouse',x:-2,z:2,world:'overworld',level:1,rotation:0,born:0},...[-2,-1,0,1].map(x=>({id:'road'+x,type:'road',x,z:1,world:'overworld',level:1,rotation:0,born:0})));
  const npcs=[0,1].map(i=>({...makeCitizen('n'+i,i,'home'),needs:{food:60,fun:0,shopping:0},wallet:100}));
  const town=initialTown();town.minute=minute;town.nextEvent=100000;
  const tiles={overworld:[-1,0,1].flatMap(x=>[-1,0,1].map(z=>({x,z}))),nether:[],end:[]};
@@ -52,5 +53,5 @@ test('无库存、暂停或没有可走土地时不能虚构消费',()=>{
 test('买不起时不成交、不扣库存',()=>{
  let s=scenario();s.npcs.forEach(n=>n.wallet=0);
  for(let i=0;i<20;i++)s=step(s);
- assert.equal(s.town.totalSales,0);assert.equal(s.town.facilities.shop.stock,12);
+ assert.equal(s.town.totalSales,0);const stock=s.town.facilities.shop.stock;assert.ok(stock>0);for(let i=0;i<10;i++)s=step(s);assert.equal(s.town.totalSales,0);assert.equal(s.town.facilities.shop.stock,stock);
 });

@@ -1,12 +1,18 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import { Html, Line } from "@react-three/drei";
 import * as THREE from "three";
 import { Box } from "../buildings/Model";
 import { useTownStore as T } from "../stores/useTownStore";
-import { useBuildingStore as B, useSettingsStore as S } from "../stores";
+import {
+  useBuildingStore as B,
+  useSettingsStore as S,
+  useUIStore as U,
+  useWorldStore as W,
+} from "../stores";
 import type { WorldId } from "../types";
-import { outsideTotal, type Hauler } from "../systems/logistics";
+import { outsideTotal, freightReason, type Hauler } from "../systems/logistics";
+import { locateFreight } from "../components/ChainDiagnosis";
 function Carrier({ h }: { h: Hauler }) {
   const ref = useRef<THREE.Group>(null!);
   const initialPosition = useRef<[number, number, number]>([
@@ -71,10 +77,59 @@ function Carrier({ h }: { h: Hauler }) {
 }
 export function FreightLayer({ world }: { world: WorldId }) {
   const l = T((s) => s.logistics),
-    buildings = B((s) => s.buildings);
+    buildings = B((s) => s.buildings),
+    overlay = U((s) => s.logisticsOverlay),
+    tiles = W((s) => s.tiles);
   if (!l) return null;
   return (
     <group name="visible-freight">
+      {overlay && (
+        <group name="logistics-overlay">
+          {l.haulers
+            .filter(
+              (h) => l.stores[h.home]?.world === world && h.route.length > 0,
+            )
+            .map((h) => (
+              <group key={h.id}>
+                <Line
+                  points={[h.position, ...h.route].map(
+                    (p) => [p.x, 0.18, p.z] as [number, number, number],
+                  )}
+                  color={
+                    h.status === "等待通行"
+                      ? "#ff9b35"
+                      : h.loaded
+                        ? "#39c987"
+                        : "#4bb8ff"
+                  }
+                  lineWidth={3}
+                />
+                {h.status === "等待通行" && (
+                  <Html position={[h.position.x, 0.8, h.position.z]} center>
+                    <span className="cargo-label">拥堵</span>
+                  </Html>
+                )}
+              </group>
+            ))}
+          {Object.values(l.stores)
+            .filter((s) => s.world === world)
+            .map((s) => {
+              const reason = freightReason(l, s, buildings, tiles);
+              return /道路|不连通/.test(reason) ? (
+                <Html key={s.id} position={[s.x, 1.2, s.z]} center>
+                  <button
+                    className="cargo-label"
+                    style={{ color: "#ffb2a5" }}
+                    onClick={() => locateFreight(s)}
+                  >
+                    {reason}
+                  </button>
+                </Html>
+              ) : null;
+            })}
+        </group>
+      )}
+
       {l.haulers
         .filter(
           (h) =>
@@ -115,11 +170,20 @@ export function FreightLayer({ world }: { world: WorldId }) {
               <Html
                 position={[0.12, 0.5, 0.05]}
                 center
-                style={{ pointerEvents: "none" }}
+                style={{ pointerEvents: "auto" }}
               >
-                <span className="cargo-label">
+                <button
+                  className="cargo-label"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    locateFreight(s);
+                    U.setState({
+                      toast: freightReason(l, s, buildings, tiles),
+                    });
+                  }}
+                >
                   堆货 {outsideTotal(s).toFixed(0)}
-                </span>
+                </button>
               </Html>
             </group>
           );

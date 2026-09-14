@@ -14,7 +14,8 @@
     "test:management": "node tests/management.mjs",
     "test:reactions": "node tests/spatial-reactions-browser.mjs",
     "test:wishes": "node tests/resident-wishes-browser.mjs",
-    "test:resources": "node tests/resource-specialization-browser.mjs"
+    "test:resources": "node tests/resource-specialization-browser.mjs",
+    "test:annual": "node tests/annual-balance.mjs && node tests/annual-report.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.0.0",

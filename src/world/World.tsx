@@ -1,3 +1,4 @@
+import {WeatherRiskLayer} from "./WeatherRiskLayer";
 import { FreightLayer } from './FreightLayer';
 import { stockTotal } from '../systems/logistics';
 import { RiverWater } from './RiverWater';
@@ -224,14 +225,12 @@ function BuildingView({
   active,
   selected,
   roadMask,
-  reactionCount,
 }: {
   b: Building;
   night: number;
   active: boolean;
   selected: boolean;
   roadMask?: number;
-  reactionCount: number;
 }) {
   const [hover, setHover] = useState(false);
   const facility = T(s => s.facilities[b.id]);
@@ -321,28 +320,6 @@ function BuildingView({
             side={THREE.DoubleSide}
           />
         </mesh>
-      )}
-      {(hover || selected) && !U.getState().placement && (
-        <Html
-          position={[0, (width + depth) * 0.7 + 0.5, 0]}
-          center
-          calculatePosition={(object, camera, size) => {
-            const point = new THREE.Vector3().setFromMatrixPosition(object.matrixWorld).project(camera);
-            const margin = size.width < 600 ? 80 : 105;
-            return [Math.max(margin, Math.min(size.width-margin, (point.x+1)*size.width/2)), Math.max(65, Math.min(size.height-60, (1-point.y)*size.height/2))];
-          }}
-          style={{ pointerEvents: "none" }}
-        >
-          <div className="world-tooltip">
-            {defs[b.type].name}
-            <small>
-              等级 {b.level}
-              {reactionCount ? ` · ${reactionCount} 个块间反应` : ""} · 点击查看
-              · 长按拖动
-            </small>
-            {facility && <small>{facility.status} · 今日净额 {Math.round(facility.dailyRevenue-facility.dailyCosts)} 金币{facility.stock ? ` · 店存 ${Math.floor(facility.stock)}` : ''}</small>}
-          </div>
-        </Html>
       )}
     </group>
   );
@@ -496,15 +473,6 @@ function Scene() {
     [local],
   );
   const reactions = useMemo(() => spatialReactions(local, defs), [local]);
-  const reactionCounts = useMemo(
-    () =>
-      reactions.reduce<Record<string, number>>((counts, reaction) => {
-        counts[reaction.buildingA] = (counts[reaction.buildingA] || 0) + 1;
-        counts[reaction.buildingB] = (counts[reaction.buildingB] || 0) + 1;
-        return counts;
-      }, {}),
-    [reactions],
-  );
   const night = nightfall(settings.hour, settings.weather.includes("dusk"));
   const hover = ui.hover;
   const footprint: [number, number] = ui.moving
@@ -563,6 +531,7 @@ function Scene() {
           <LandOverlay />
           <Scenery world={current} tiles={tiles[current]} buildings={local} />
           <FreightLayer world={current}/>
+          <WeatherRiskLayer world={current}/>
           <SpatialReactionLayer
             reactions={reactions}
             selected={selected}
@@ -589,7 +558,6 @@ function Scene() {
               }
               active={!b.paused && !offline.includes(b.id)}
               selected={selected === b.id}
-              reactionCount={reactionCounts[b.id] || 0}
               roadMask={
                 b.type === "bridge" || !roadType(b.type)
                   ? undefined
@@ -867,6 +835,28 @@ function Diagnostics() {
         scene.updateMatrixWorld(true);
         scene.traverse(obj=>{if(obj.name.startsWith('freight-hauler:'))carriers.push({id:obj.name,position:obj.getWorldPosition(new THREE.Vector3()).toArray()});if(obj.name.startsWith('cargo-pile:'))piles.push(obj.name);});
         return {carriers,piles};
+      },
+      movement: () => {
+        const citizens: { id: string; position: number[]; visible: boolean }[] = [];
+        const scars: { id: string; size: number[] }[] = [];
+        scene.updateMatrixWorld(true);
+        scene.traverse((obj) => {
+          if (obj.name.startsWith("citizen:"))
+            citizens.push({
+              id: obj.name.slice(8),
+              position: obj.getWorldPosition(new THREE.Vector3()).toArray(),
+              visible: obj.visible,
+            });
+          if (obj.name.startsWith("climate-scar:"))
+            scars.push({
+              id: obj.name,
+              size: new THREE.Box3()
+                .setFromObject(obj)
+                .getSize(new THREE.Vector3())
+                .toArray(),
+            });
+        });
+        return { citizens, scars };
       },
       picked: () => lastBuildingClick,
       state: () => ({

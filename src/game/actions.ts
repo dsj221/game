@@ -1,4 +1,5 @@
-import { cloneLogistics, deposit } from '../systems/logistics';
+import {marketPrice,tradeGoods} from "../systems/marketTrade";
+import { cloneLogistics, deposit, spendableBag } from '../systems/logistics';
 import { waterSiteReason } from '../systems/hydrology';
 import {
   useBuildingStore as B,
@@ -12,6 +13,7 @@ import {
 import { defs } from "../data/definitions";
 import { retiredBuildingTypes } from "../data/playable";
 import { uid } from "../data/initial";
+import { makeCitizen } from "../data/settlement";
 import { useTownStore as T } from "../stores/useTownStore";
 import { simulateTown, metrics } from "./TownSimulation";
 import { validSchedule, type WorkSchedule } from "../systems/workSchedule";
@@ -30,6 +32,8 @@ export function developTown(
     { kind, id, allowFood },
   );
   if ("error" in result) return notify(result.error);
+  const current=R.getState().bag, available=spendableBag(T.getState(),current);
+  if(Object.keys(current).some(k=>current[k as Resource]-result.bag[k as Resource]>available[k as Resource]+1e-8)) return notify("物资已列入最低储备，请先调整仓库规则");
   T.setState(result.town);
   R.setState({ bag: result.bag, currency: result.currency });
   notify(result.message!);
@@ -146,6 +150,7 @@ export function promoteTown() {
     N.getState().npcs,
     R.getState().bag,
     t.facilities,
+    t.logistics,
   );
   if (
     !next ||
@@ -271,6 +276,8 @@ export function removeBuilding(id: string) {
       B.getState().buildings,
       N.getState().npcs,
       R.getState().bag,
+      T.getState().facilities,
+      T.getState().logistics,
     ),
   });
   panel(null);
@@ -462,7 +469,7 @@ export function buildAt(x: number, z: number) {
   if (r.currency < d.cost)
     return notify("金币不足，可按住获取金币，或完成委托、出售库存");
   for (const [k, v] of Object.entries(d.materials || {}))
-    if (r.bag[k as Resource] < v)
+    if (spendableBag(T.getState(),r.bag)[k as Resource] < v)
       return notify(`${k === "wood" ? "木材" : "铁矿"}不足`);
   const bag = { ...r.bag };
   for (const [k, v] of Object.entries(d.materials || {}))
@@ -487,15 +494,44 @@ export function buildAt(x: number, z: number) {
   });
   const placed = B.getState().buildings.find((building) => building.id === id)!;
   const reactions = reactionsForBuilding(placed, B.getState().buildings, defs);
+  const residentCount = N.getState().npcs.filter(
+      (npc) => npc.world === world && npc.modelType === "villager",
+    ).length,
+    newResident =
+      world === "overworld" && d.town?.capacity
+        ? makeCitizen(uid(), residentCount, id, world)
+        : null;
+  if (newResident)
+    N.setState((state) => ({ npcs: [...state.npcs, newResident] }));
   G.setState((s) => ({ built: s.built + 1 }));
   T.setState((t) => ({
     builtCounts: { ...t.builtCounts, [d.id]: (t.builtCounts[d.id] || 0) + 1 },
+    // A newly completed home should visibly attract a neighbour on the next
+    // eligible simulation ticks instead of appearing empty for over a minute.
+    migrationProgress: d.town?.capacity
+      ? Math.max(t.migrationProgress, 13)
+      : t.migrationProgress,
+    ledger: newResident
+      ? { ...t.ledger, arrivals: t.ledger.arrivals + 1 }
+      : t.ledger,
+    notices: newResident
+      ? [
+          {
+            id: `resident-build-${id}`,
+            text: `${newResident.name}搬入了${d.name}！`,
+            kind: "resident" as const,
+            building: id,
+            tick: G.getState().ticks,
+          },
+          ...t.notices,
+        ].slice(0, 24)
+      : t.notices,
     pulses: [
       ...t.pulses,
       {
         id: `build-${id}`,
         building: id,
-        text: `-${d.cost} 金币`,
+        text: newResident ? `${newResident.name}入住` : `-${d.cost} 金币`,
         tick: G.getState().ticks,
       },
     ].slice(-12),
@@ -504,7 +540,9 @@ export function buildAt(x: number, z: number) {
   if (["tree", "road", "farm"].includes(d.id)) achieve(d.id);
   tone("build");
   notify(
-    reactions.length
+    newResident
+      ? `${d.name}已建成 · ${newResident.name}搬进来了`
+      : reactions.length
       ? `${d.name}已建成 · 形成${reactions.map((reaction) => reaction.name).join("、")}`
       : `${d.name}已建成`,
   );
@@ -612,7 +650,7 @@ export function upgrade(id: string) {
     resources = R.getState();
   if (b.level >= defs[b.type].maxLevel) return notify("已达到最高等级");
   if (resources.currency < price) return notify("金币不足");
-  if (resources.bag.furniture < furniture)
+  if (spendableBag(T.getState(),resources.bag).furniture < furniture)
     return notify(`住宅升级还需要 ${furniture} 份家具`);
   R.setState({
     currency: resources.currency - price,
@@ -720,37 +758,8 @@ export function recruit(modelType = "copper") {
   notify("新伙伴已经来到大陆");
   tone("build");
 }
-export const priceOf = (resource: Resource) =>
-  ({
-    wood: 3,
-    stone: 4,
-    iron: 12,
-    redstone: 24,
-    food: 3,
-    wheat: 2,
-    flour: 4,
-    bread: 7,
-    furniture: 15,
-    pottery: 12,
-    tools: 18,
-  })[resource] *
-  (1 +
-    0.15 *
-      Math.sin(
-        G.getState().ticks / 30 +
-          ["wood", "stone", "iron", "redstone", "food"].indexOf(resource),
-      ));
-export function trade(resource: Resource, buy: boolean) {
-  const r = R.getState(),
-    price = Math.ceil(priceOf(resource) * 10 * (buy ? 1.15 : 1));
-  if (buy && r.currency < price) return notify("金币不足");
-  if (!buy && r.bag[resource] < 10) return notify("资源不足 10 份");
-  R.setState({
-    currency: r.currency + (buy ? -price : price),
-    bag: { ...r.bag, [resource]: r.bag[resource] + (buy ? 10 : -10) },
-  });
-  tone("collect");
-}
+export const priceOf=(resource:Resource)=>marketPrice(resource,G.getState().ticks);
+export function trade(resource:Resource,buy:boolean){const r=R.getState(),result=tradeGoods(T.getState(),r.bag,r.currency,resource,buy,G.getState().ticks);if(!result)return notify(buy?'金币不足':'可用资源不足 10 份（含最低储备限制）');R.setState(result);tone('collect');}
 export function setProgram(program: string) {
   G.setState({ program });
   achieve("live");
@@ -767,7 +776,7 @@ export function studioAction(action: string) {
     G.setState({ gifts: 0 });
     notify("观众的心意已经收下");
   } else if (action === "订单") {
-    if (r.bag.food < 30 || r.bag.wood < 20)
+    if (spendableBag(T.getState(),r.bag).food < 30 || spendableBag(T.getState(),r.bag).wood < 20)
       return notify("订单需要 30 食物与 20 木材");
     R.setState({
       currency: r.currency + 500,

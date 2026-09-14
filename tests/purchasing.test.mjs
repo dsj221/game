@@ -53,5 +53,9 @@ test('无库存、暂停或没有可走土地时不能虚构消费',()=>{
 test('买不起时不成交、不扣库存',()=>{
  let s=scenario();s.npcs.forEach(n=>n.wallet=0);
  for(let i=0;i<20;i++)s=step(s);
- assert.equal(s.town.totalSales,0);const stock=s.town.facilities.shop.stock;assert.ok(stock>0);for(let i=0;i<10;i++)s=step(s);assert.equal(s.town.totalSales,0);assert.equal(s.town.facilities.shop.stock,stock);
+ assert.equal(s.town.totalSales,0);const stock=s.town.facilities.shop.stock;assert.ok(stock>0);for(let i=0;i<10;i++)s=step(s);assert.equal(s.town.totalSales,0);assert.ok(s.town.facilities.shop.stock>=stock);const total=s.town.facilities.shop.stock+Object.values(s.town.logistics.stores).reduce((n,s)=>n+(s.inside.food||0)+(s.outside.food||0),0)+s.town.logistics.haulers.reduce((n,h)=>n+(h.loaded&&h.resource==='food'?h.amount:0),0);assert.ok(Math.abs(total-100)<1e-8);
+});
+
+test('买不起商店食物时回到有粮的家中吃饭，不在商店无限等待',async()=>{
+ const {prepareLogistics,deposit}=await import('../src/systems/logistics.ts');let s=scenario();s.npcs.forEach(n=>{n.wallet=0;n.needs.food=95;});s.bag=emptyBag();prepareLogistics(s.town,s.buildings,s.bag,s.tiles);deposit(s.town.logistics.stores.home,'food',4);s.town.facilities.shop={...emptyFacility(),stock:12};for(let i=0;i<30;i++)s=step(s);const resident=s.npcs.find(n=>!n.workplace);assert.ok(resident.needs.food<90);assert.equal(s.town.totalSales,0);assert.ok(s.town.ledger.consumed.food>=1);
 });

@@ -43,6 +43,11 @@ export function advanceTravel(
       cost = grid.get(`${next.x},${next.z}`) || 2.5;
     if (n.travelProgress >= cost) {
       n.position = n.route.shift()!;
+      n.movementStep = (n.movementStep || 0) + 1;
+      n.movementTrail = [
+        ...(n.movementTrail || []).slice(-15),
+        { ...n.position, step: n.movementStep },
+      ];
       n.travelProgress -= cost;
     }
   }

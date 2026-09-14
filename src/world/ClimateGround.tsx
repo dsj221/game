@@ -18,24 +18,35 @@ export function ClimateGround() {
     <group>
       {cells?.map((c) => (
         <group key={`${c.x}:${c.z}`} position={[c.x, 0.13, c.z]}>
-          {c.scar &&
-            [0, 1, 2].map((i) => (
-              <mesh
-                key={i}
-                rotation={[-Math.PI / 2, 0, i * 0.8]}
-                position={[(i - 1) * 0.28, 0.003 * i, 0]}
-              >
-                <planeGeometry
-                  args={[c.scar === "cracks" ? 0.035 : 0.2, 0.8]}
-                />
-                <meshStandardMaterial
-                  color={colors[c.scar!]}
-                  transparent
-                  opacity={0.85}
-                  depthWrite={false}
-                />
-              </mesh>
-            ))}
+          {c.scar && (
+            <group
+              name={`climate-scar:${c.x},${c.z}:${c.scar}`}
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              {[0, 1, 2].map((i) => (
+                <mesh
+                  key={i}
+                  rotation={[0, 0, i * 0.8]}
+                  position={[(i - 1) * 0.2, (i % 2) * 0.12 - 0.06, 0.003 * i]}
+                  scale={c.scar === "mud" ? [0.24, 0.15, 1] : [1, 1, 1]}
+                >
+                  {c.scar === "mud" ? (
+                    <circleGeometry args={[1, 12]} />
+                  ) : (
+                    <planeGeometry
+                      args={[c.scar === "cracks" ? 0.035 : 0.2, 0.8]}
+                    />
+                  )}
+                  <meshStandardMaterial
+                    color={colors[c.scar!]}
+                    transparent
+                    opacity={c.scar === "mud" ? 0.42 : 0.65}
+                    depthWrite={false}
+                  />
+                </mesh>
+              ))}
+            </group>
+          )}
           {c.canal && (
             <group name={`water-channel:${c.x},${c.z}`}>
               <mesh position={[0, 0.015, 0]}>

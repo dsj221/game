@@ -4,11 +4,14 @@ import {simulateTown,metrics,questProgress} from '../src/game/TownSimulation.ts'
 import {settlementBuildings,settlementTiles,settlementNpcs,makeCitizen} from '../src/data/settlement.ts';
 import {emptyBag,initialTown,emptyFacility} from '../src/data/town.ts';
 import {defs} from '../src/data/definitions.ts';
+import {deposit,prepareLogistics} from '../src/systems/logistics.ts';
 const building=(type,x,z,i=type)=>({id:i,type,x,z,world:'overworld',level:1,rotation:0,born:0});
 function start(){const buildings=settlementBuildings();return{town:initialTown(),buildings,npcs:settlementNpcs(buildings),bag:{...emptyBag(),wood:30,food:20},currency:1000,tick:0,weather:[]}}
 function run(s,n){for(let i=0;i<n;i++)s=simulateTown(s);return s}
 test('新局从 12×9 小大陆、1000 金币、2 位居民开始',()=>{const s=start();assert.equal(settlementTiles().overworld.length,12);assert.equal(s.npcs.length,2);assert.equal(s.currency,1000);assert.equal(metrics(s.buildings,s.npcs,s.bag).capacity,2)});
 test('没有空房时人口不增长；住宅和岗位允许新居民入住',()=>{let s=start();s.buildings.push(building('farm',-2,0));assert.equal(run(s,80).npcs.length,2);s.buildings.push(building('house',-3,0,'newhouse'));s=run(s,100);assert.ok(s.npcs.length>2);assert.ok(s.npcs.length<=4);assert.ok(s.npcs.every(n=>n.home));});
+test('送到住宅小库存的食物仍支持新居民入住',()=>{let s=start();s.buildings.push(building('farm',-2,0),building('house',-3,0,'newhouse'));prepareLogistics(s.town,s.buildings,s.bag,settlementTiles());const warehouse=Object.values(s.town.logistics.stores).find(v=>v.warehouse),home=s.town.logistics.stores.newhouse;warehouse.inside.food=0;warehouse.outside.food=0;s.bag.food=0;deposit(home,'food',4);s.town.migrationProgress=13;s=run(s,8);assert.ok(s.npcs.length>2,`居民 ${s.npcs.length}，原因：${s.town.metrics.growthReason}`);assert.ok(s.town.metrics.foodDays>=.5);});
+test('旧版本留下的完全空置住宅会自动迎来第一位居民',()=>{let s=start();s.bag=emptyBag();s.buildings.push(building('house',-3,0,'empty-home'));s=run(s,1);assert.equal(s.npcs.length,3);assert.equal(s.npcs.at(-1).home,'empty-home');});
 test('员工在白天工作，生产进入真实库存',()=>{let s=start();s.buildings.push(building('farm',-2,0));s=run(s,80);assert.ok(s.bag.wheat>0);assert.ok(s.town.ledger.produced.wheat>0);assert.equal(s.npcs.filter(n=>n.workplace).length,2)});
 test('原料不足时面包房暂停；补足面粉后消耗原料产出面包',()=>{let s=start();s.town.minute=500;const b=building('bakery',-2,0);s.buildings.push(b);s=run(s,20);assert.equal(s.town.facilities[b.id].status,'缺少原料');assert.equal(s.bag.bread,0);s.bag.flour=2;s=run(s,25);assert.equal(s.bag.flour,0);assert.equal(s.bag.bread,4);});
 test('居民消费减少商品和钱包余额，形成营业额与成本',()=>{let s=start();s.town.minute=600;const b=building('shop',-2,0);s.buildings.push(b);s.npcs.forEach(n=>{n.needs.food=50;n.wallet=100});s=run(s,8);const f=s.town.facilities[b.id];assert.ok(f.customers>0);assert.equal(s.town.totalSales,f.customers);assert.ok(f.revenue>0&&f.costs>0);assert.ok(s.town.ledger.consumed.food>0);assert.ok(s.npcs.some(n=>n.wallet<95));assert.ok(s.bag.food<20);});

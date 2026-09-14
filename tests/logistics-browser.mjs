@@ -102,6 +102,14 @@ try {
   await page.waitForTimeout(250);
   const view = await page.evaluate(() => window.worldDiagnostics.freight());
   assert.ok(view.carriers.length > 0);
+  await page.evaluate(() =>
+    window.freightStores.useUIStore.setState({ logisticsOverlay: true }),
+  );
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: "test-results/logistics-routes.png" });
+  await page.evaluate(() =>
+    window.freightStores.useUIStore.setState({ logisticsOverlay: false }),
+  );
   const persisted = await page.evaluate(async () => {
     const p = await import("/src/systems/persistence.ts"),
       s = window.freightStores;
@@ -153,6 +161,142 @@ try {
     ),
     16,
   );
+  await page.evaluate(() =>
+    window.freightStores.useUIStore.setState({ panel: "daily" }),
+  );
+  await page.getByRole("button", { name: "显示物流地图", exact: true }).click();
+  assert.equal(
+    await page.evaluate(
+      () => window.freightStores.useUIStore.getState().logisticsOverlay,
+    ),
+    true,
+  );
+  await page
+    .locator(".logistics-panel article")
+    .filter({ has: page.getByLabel("仓库 high 收货优先级") })
+    .getByText("逐项仓储规则", { exact: true })
+    .click();
+  await page.getByLabel("highwheat最低储备", { exact: true }).fill("12");
+  await page.getByLabel("highwheat目标库存", { exact: true }).fill("20");
+  await page.getByLabel("highwheat允许储存", { exact: true }).uncheck();
+  assert.ok(
+    await page.evaluate(async () => {
+      const s = window.freightStores,
+        p = await import("/src/systems/persistence.ts"),
+        before = JSON.stringify(s.T.getState().logistics);
+      p.save(true);
+      s.T.setState({ logistics: undefined });
+      p.load();
+      return JSON.stringify(s.T.getState().logistics) === before;
+    }),
+  );
+  assert.ok(
+    await page.evaluate(async () => {
+      const s = window.freightStores,
+        { trade } = await import("/src/game/actions.ts");
+      const before = s.useResourceStore.getState().bag.wheat;
+      trade("wheat", false);
+      return s.useResourceStore.getState().bag.wheat === before;
+    }),
+  );
+  await page
+    .locator(".logistics-panel article")
+    .filter({ has: page.getByLabel("仓库 high 收货优先级") })
+    .getByText("运力与班次", { exact: true })
+    .click();
+  await page.getByLabel("highporters", { exact: true }).fill("3");
+  await page.getByLabel("highcarts", { exact: true }).fill("2");
+  await page.getByLabel("high运输上班", { exact: true }).fill("22");
+  await page.getByLabel("high运输下班", { exact: true }).fill("6");
+  await page
+    .getByLabel("highporters", { exact: true })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "test-results/transport-policy.png" });
+  assert.ok(
+    await page.evaluate(async () => {
+      const s = window.freightStores,
+        p = await import("/src/systems/persistence.ts");
+      const before = JSON.stringify(
+        s.T.getState().logistics.stores.high.transport,
+      );
+      p.save(true);
+      s.T.setState({ logistics: undefined });
+      p.load();
+      const same =
+        before ===
+        JSON.stringify(s.T.getState().logistics.stores.high.transport);
+      const bad = p.snapshot();
+      bad.town = structuredClone(bad.town);
+      bad.town.logistics.stores.high.transport.carts = 7;
+      let rejected = false;
+      try {
+        p.validate(bad);
+      } catch {
+        rejected = true;
+      }
+      return same && rejected;
+    }),
+  );
+  await page.locator(".chain-diagnosis").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "test-results/logistics-diagnosis.png" });
+  await page.locator(".chain-diagnosis button").first().click();
+  assert.equal(
+    await page.evaluate(
+      () => window.freightStores.useBuildingStore.getState().selected,
+    ),
+    "farm",
+  );
+  await page.evaluate(async () => {
+    const s = window.freightStores,
+      { initialTown } = await import("/src/data/town.ts"),
+      { climateStep } = await import("/src/systems/climate.ts");
+    const b = (id, type, x, z) => ({
+      id,
+      type,
+      x,
+      z,
+      world: "overworld",
+      level: 1,
+      rotation: 0,
+      born: 0,
+    });
+    const sites = [
+      b("forecast-farm", "farm", -4, 0),
+      b("forecast-wheel", "watermill", -6, 0),
+    ];
+    const t = initialTown();
+    t.day = 21;
+    t.minute = 0;
+    climateStep(t, sites, s.useWorldStore.getState().tiles.overworld);
+    s.useBuildingStore.setState({ buildings: sites, selected: null });
+    s.T.setState(t, true);
+    s.useUIStore.setState({ panel: "daily", weatherRiskOverlay: false });
+  });
+  await page.getByRole("button", { name: "更新影响估算", exact: true }).click();
+  await page
+    .getByRole("button", { name: "显示天气风险地图", exact: true })
+    .click();
+  const forecast = await page.evaluate(
+    () => window.freightStores.useUIStore.getState().weatherImpact,
+  );
+  assert.equal(forecast.event, "夏季缺水");
+  assert.ok(forecast.powerMin < forecast.powerNow);
+  assert.ok(forecast.risks.some((r) => r.id === "forecast-farm"));
+  await page.locator(".weather-impact").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "test-results/weather-impact.png" });
+  await page
+    .locator(".weather-impact button")
+    .filter({ hasText: "缺水 ·" })
+    .first()
+    .click();
+  assert.equal(
+    await page.evaluate(
+      () => window.freightStores.useBuildingStore.getState().selected,
+    ),
+    "forecast-farm",
+  );
+  await page.waitForTimeout(500);
+  await page.screenshot({path:"test-results/weather-risk-map.png"});
   assert.deepEqual(errors, []);
   console.log(
     "Warehouse priority UI, visible piles, road repair, moving loaded haulers, in-flight save/load and physical delivery passed.",

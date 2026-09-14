@@ -95,6 +95,8 @@ export interface Npc {
   route?: { x: number; z: number }[];
   arrivedAt?: string;
   travelProgress?: number;
+  movementStep?: number;
+  movementTrail?: { x: number; z: number; step: number }[];
   wish?: ResidentWish;
   wishCooldownUntil?: number;
   memories?: ResidentMemory[];

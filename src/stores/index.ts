@@ -52,6 +52,9 @@ export const useUIStore = create<{
   draggingBuilding: boolean;
   toast: string;
   collecting: boolean;
+  weatherRiskOverlay:boolean;
+  weatherImpact:import("../systems/weatherImpact").WeatherImpact|null;
+  logisticsOverlay: boolean;
   cameraReset: number;
   cameraFocus: {x:number;z:number;nonce:number}|null;
   activeGuide:string|null;
@@ -69,6 +72,9 @@ export const useUIStore = create<{
   draggingBuilding: false,
   toast: "",
   collecting: false,
+  weatherRiskOverlay:false,
+  weatherImpact:null,
+  logisticsOverlay: false,
   cameraReset: 0,
   cameraFocus:null,
   activeGuide:null,

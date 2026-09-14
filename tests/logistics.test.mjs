@@ -2,6 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { initialTown, emptyBag } from "../src/data/town.ts";
 import {
+  stockRule,
+  setStockRule,
+  spendableBag,
+  freightReason,
   prepareLogistics,
   logisticsStep,
   stockAmount,
@@ -280,3 +284,113 @@ for (const [makerType, shopType, resource] of [
     assert.ok(s.town.facilities.sale.customers > 0);
     assert.ok(s.town.logistics.delivered > 0);
   });
+
+test("仓储禁收、目标库存限制实际货运，并保留未送达货物", () => {
+  const s = setup();
+  deposit(s.town.logistics.stores.f, "wheat", 16);
+  s.town = setStockRule(s.town, "w", "wheat", {
+    allowed: false,
+    minimum: 0,
+    target: 6,
+  });
+  for (let i = 0; i < 50; i++) step(s);
+  assert.equal(s.bag.wheat, 0);
+  assert.match(
+    freightReason(
+      s.town.logistics,
+      s.town.logistics.stores.f,
+      s.buildings,
+      tiles,
+    ),
+    /禁收/,
+  );
+  s.town = setStockRule(s.town, "w", "wheat", {
+    allowed: true,
+    minimum: 0,
+    target: 6,
+  });
+  for (let i = 0; i < 100; i++) step(s);
+  assert.equal(s.bag.wheat, 6);
+  assert.equal(goods(s), 16);
+  assert.equal(stockRule(s.town.logistics.stores.w, "wheat").target, 6);
+});
+test("最低储备锁定外部消费和工坊外运，降低储备后恢复", () => {
+  const s = setup(
+    [b("w", "warehouse", -3, -1), b("f", "windmill", 3, -1), ...roads()],
+    { ...emptyBag(), wheat: 10 },
+  );
+  s.town = setStockRule(s.town, "w", "wheat", {
+    allowed: true,
+    minimum: 10,
+    target: 10,
+  });
+  assert.equal(spendableBag(s.town, s.bag).wheat, 0);
+  for (let i = 0; i < 50; i++) step(s);
+  assert.equal(stockAmount(s.town.logistics.stores.f, "wheat"), 0);
+  s.town = setStockRule(s.town, "w", "wheat", {
+    allowed: true,
+    minimum: 4,
+    target: 10,
+  });
+  assert.equal(spendableBag(s.town, s.bag).wheat, 6);
+  for (let i = 0; i < 60; i++) step(s);
+  assert.equal(stockAmount(s.town.logistics.stores.w, "wheat"), 4);
+  assert.equal(goods(s), 10);
+});
+test("仓储规则拒绝非法值，物流诊断定位断路和暂停", () => {
+  const s = setup();
+  assert.equal(
+    setStockRule(s.town, "w", "wheat", {
+      allowed: true,
+      minimum: 8,
+      target: 2,
+    }),
+    null,
+  );
+  assert.equal(
+    setStockRule(s.town, "w", "wheat", {
+      allowed: true,
+      minimum: 0,
+      target: Infinity,
+    }),
+    null,
+  );
+  s.buildings = s.buildings.filter((b) => b.id !== "r6");
+  assert.match(
+    freightReason(
+      s.town.logistics,
+      s.town.logistics.stores.f,
+      s.buildings,
+      tiles,
+    ),
+    /未连接道路/,
+  );
+  s.town.logistics.stores.f.active = false;
+  assert.match(
+    freightReason(
+      s.town.logistics,
+      s.town.logistics.stores.f,
+      s.buildings,
+      tiles,
+    ),
+    /暂停/,
+  );
+});
+
+test("外部购入不绕过禁收规则，溢出卸货点保留全部物资", () => {
+  const s = setup();
+  s.town = setStockRule(s.town, "w", "wheat", {
+    allowed: false,
+    minimum: 0,
+    target: 0,
+  });
+  s.bag.wheat = 10;
+  step(s);
+  assert.equal(stockAmount(s.town.logistics.stores.w, "wheat"), 0);
+  assert.equal(
+    stockAmount(s.town.logistics.stores["external-delivery"], "wheat"),
+    10,
+  );
+  assert.equal(goods(s), 10);
+  assert.equal(s.bag.wheat, 10);
+});

@@ -1,3 +1,4 @@
+import {spendableBag} from "../systems/logistics";
 import { useState } from "react";
 import { useTownStore as T } from "../stores/useTownStore";
 import {
@@ -72,14 +73,14 @@ export function HydrologyPanel() {
           </p>
           {h.damZ === null ? (
             <button
-              disabled={r.bag.wood < 20 || r.bag.stone < 30}
+              disabled={spendableBag(T.getState(),r.bag).wood < 20 || spendableBag(T.getState(),r.bag).stone < 30}
               onClick={() => {
                 const resources = R.getState(),
                   town = T.getState(),
                   next = buildDam(
                     town.hydrology,
-                    resources.bag.wood,
-                    resources.bag.stone,
+                    spendableBag(T.getState(),resources.bag).wood,
+                    spendableBag(T.getState(),resources.bag).stone,
                   );
                 if (next) {
                   T.setState({ hydrology: next });
@@ -198,13 +199,13 @@ export function HydrologyPanel() {
             </p>
             {!reach && (
               <button
-                disabled={!!channel || r.bag.wood < 5 || r.bag.stone < 5}
+                disabled={!!channel || spendableBag(T.getState(),r.bag).wood < 5 || spendableBag(T.getState(),r.bag).stone < 5}
                 onClick={() => {
                   const resources = R.getState(),
                     next = canalProject(
                       T.getState(),
-                      resources.bag.wood,
-                      resources.bag.stone,
+                      spendableBag(T.getState(),resources.bag).wood,
+                      spendableBag(T.getState(),resources.bag).stone,
                       selected.x,
                       selected.z,
                       tiles,

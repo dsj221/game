@@ -1,4 +1,5 @@
 import { prepareLogistics, logisticsStep, warehouseBag, stockAmount, takeStock, deposit, outsideTotal } from '../systems/logistics.ts';
+import type { Logistics } from "../systems/logistics.ts";
 import { climateStep, climateEfficiency, seasonAt } from '../systems/climate.ts';
 import type { Bag, Building, Npc, Resource } from "../types/index.ts";
 import type {
@@ -160,6 +161,7 @@ export function metrics(
   npcs: Npc[],
   bag: Bag,
   facilities: Record<string, Facility> = {},
+  logistics?: Logistics,
 ): TownMetrics {
   const locals = npcs.filter(
       (n) => n.world === "overworld" && n.modelType === "villager",
@@ -205,7 +207,26 @@ export function metrics(
         : 0),
     0,
   );
-  const foodDays = (bag.food + bag.bread + shopFood) / foodDemand;
+  // The resource bar only mirrors warehouse inventory. Food already delivered
+  // to homes, workplaces, or currently carried by a hauler is still available
+  // to the town and must count toward migration and supply estimates.
+  const distributedFood = logistics
+      ? Object.values(logistics.stores)
+          .filter((stock) => !stock.warehouse && stock.world === "overworld")
+          .reduce(
+            (total, stock) =>
+              total + stockAmount(stock, "food") + stockAmount(stock, "bread"),
+            0,
+          ) +
+        logistics.haulers
+          .filter(
+            (hauler) =>
+              hauler.loaded &&
+              (hauler.resource === "food" || hauler.resource === "bread"),
+          )
+          .reduce((total, hauler) => total + hauler.amount, 0)
+      : 0,
+    foodDays = (bag.food + bag.bread + shopFood + distributedFood) / foodDemand;
   const attraction = clamp(
     happiness * 0.6 +
       environment * 0.25 +
@@ -358,7 +379,7 @@ export function simulateTown(input: SimInput): SimOutput {
   t.minute += 4;
   if (t.minute >= 1440) {
     t.minute -= 1440;
-    const m = metrics(buildings, npcs, bag, t.facilities);
+    const m = metrics(buildings, npcs, bag, t.facilities, t.logistics);
     t.reports = [
       {
         ...cloneLedger(t.ledger),
@@ -385,7 +406,7 @@ export function simulateTown(input: SimInput): SimOutput {
   climateStep(t, buildings, input.tiles?.overworld);
   if (input.tiles) {
     prepareLogistics(t, buildings, bag, input.tiles);
-    logisticsStep(t, buildings, bag, input.tiles, tick);
+    currency -= logisticsStep(t, buildings, bag, input.tiles, tick);
   }
   if (seasonAt(t.day) === 3) {
     const residents = npcs.filter(n => n.world === "overworld" && n.modelType === "villager");
@@ -453,6 +474,8 @@ export function simulateTown(input: SimInput): SimOutput {
     if (!c) continue;
     const f = (t.facilities[b.id] ??= emptyFacility());
     const localStock = input.tiles ? t.logistics?.stores[b.id] : undefined;
+    const freightCost=localStock?.transportCosts,previousFreight=input.town.logistics?.stores[b.id]?.transportCosts;
+    if(freightCost?.day===t.day){const cost=freightCost.wages+freightCost.maintenance-(previousFreight?.day===t.day?previousFreight.wages+previousFreight.maintenance:0);f.costs+=cost;f.dailyCosts+=cost;}
     const available = (r:Resource) => localStock ? stockAmount(localStock,r) : bag[r];
     const consume = (r:Resource,n:number) => {if(localStock)takeStock(localStock,r,n);else bag[r]-=n;};
     const shift = onShift(t.minute, f, !!c.sells);
@@ -587,7 +610,7 @@ export function simulateTown(input: SimInput): SimOutput {
           b.level *
           (b.type === "farm" && rain ? 0.8 : 1) *
           (["food", "wheat"].includes(r) ? bonuses.food : 1);
-        if(localStock)deposit(localStock,r as Resource,quantity);else bag[r as Resource] += quantity;
+        if(localStock){deposit(localStock,r as Resource,quantity);const prev=localStock.production;localStock.production={day:t.day,amounts:{...(prev?.day===t.day?prev.amounts:{}),[r]:(prev?.day===t.day?prev.amounts[r as Resource] || 0:0)+quantity}};}else bag[r as Resource] += quantity;
         addResource(t.ledger.produced, r as Resource, quantity);
         f.produced += quantity;
         pulse(
@@ -607,7 +630,7 @@ export function simulateTown(input: SimInput): SimOutput {
         activeInfluence.get(shop.id)?.blockEffects.customers || 0,
       ]),
     ),
-    consumerMetrics = metrics(buildings, npcs, bag, t.facilities);
+    consumerMetrics = metrics(buildings, npcs, bag, t.facilities, t.logistics);
   for (const [index, n] of npcs.entries()) {
     if (n.modelType !== "villager") continue;
     n.wallet = (n.wallet || 0) + 24 / 360; // Household remittances keep purchasing power circulating.
@@ -640,6 +663,7 @@ export function simulateTown(input: SimInput): SimOutput {
     const shopShift =
       !!workplace &&
       onShift(t.minute, t.facilities[workplace.id], !!cfg(workplace)?.sells);
+    const affordable=(b:Building)=>{const c=cfg(b)!,f=t.facilities[b.id],scarcity=c.sells==="food"||c.sells==="bread"?1+clamp(1-consumerMetrics.foodDays,0,.2):1;return (n.wallet || 0)>=Math.round((c.price || 12)*f.priceFactor*(festival?1.3:seasonAt(t.day)===2?1.15:1)*scarcity);};
     const shop = shops
       .filter(
         (b) =>
@@ -650,6 +674,7 @@ export function simulateTown(input: SimInput): SimOutput {
           t.facilities[b.id]?.staff > 0 &&
           t.facilities[b.id].stock >= 1 &&
           t.facilities[b.id].priceFactor <= 1.5 &&
+          affordable(b) &&
           (festival ||
             (foodNeed && ["food", "bread"].includes(cfg(b)?.sells || "")) ||
             (funNeed && ["cafe", "tea_house"].includes(b.type)) ||
@@ -676,8 +701,10 @@ export function simulateTown(input: SimInput): SimOutput {
         t.minute >= 1080 && t.minute < 1260 ? localParks[0] : undefined;
       // Keep shop staff at the counter throughout opening hours.
       const destination =
-        shopShift && cfg(workplace!)?.sells
+        shopShift && (cfg(workplace!)?.sells || n.needs.food<=75)
           ? workplace
+          : !shop && n.needs.food>75 && (stockAmount(t.logistics?.stores[n.home || ""],"food")>=1 || stockAmount(t.logistics?.stores[n.home || ""],"bread")>=1)
+            ? residence
           : shop && (foodNeed || funNeed || shoppingNeed || festival)
             ? shop
             : shopShift
@@ -756,12 +783,14 @@ export function simulateTown(input: SimInput): SimOutput {
         n.needs.shopping = clamp(n.needs.shopping + 0.5);
       }
     }
-    const homeStock = input.tiles ? t.logistics?.stores[n.home||""] : undefined;
-    if (n.needs.food > 75 && (homeStock ? stockAmount(homeStock,"food") : input.tiles ? 0 : bag.food) >= 1 && (!input.tiles || n.arrivedAt === n.home) && tick % 12 === index % 12) {
-      if(homeStock)takeStock(homeStock,"food",1);else bag.food -= 1;
-      n.needs.food = clamp(n.needs.food - 35);
-      addResource(t.ledger.consumed, "food", 1);
-      n.recent = input.tiles ? "吃到了搬运员送到家中的储备粮。" : "在社区仓库领到一份食物，希望街角很快有商店。";
+    const mealSite = input.tiles && n.arrivedAt===n.workplace ? n.workplace : n.home;
+    const homeStock = input.tiles ? t.logistics?.stores[mealSite||""] : undefined;
+    const mealResource:Resource=homeStock&&stockAmount(homeStock,"food")<1&&stockAmount(homeStock,"bread")>=1?"bread":"food";
+    if (n.needs.food > 75 && (homeStock ? stockAmount(homeStock,mealResource) : input.tiles ? 0 : bag.food) >= 1 && (!input.tiles || n.arrivedAt === mealSite) && tick % 12 === index % 12) {
+      if(homeStock)takeStock(homeStock,mealResource,1);else bag.food -= 1;
+      n.needs.food = clamp(n.needs.food - (mealResource==="bread"?55:35));
+      addResource(t.ledger.consumed, mealResource, 1);
+      n.recent = input.tiles ? "吃到了搬运员送到家中或工作场所的储备粮。" : "在社区仓库领到一份食物，希望街角很快有商店。";
     }
     if (!bought && tick - (n.lastPurchase ?? -100) > 12) {
       if (shopShift) {
@@ -817,13 +846,26 @@ export function simulateTown(input: SimInput): SimOutput {
       (n.happiness ?? 78) + (target - (n.happiness ?? 78)) * 0.025,
     );
   }
-  t.metrics = metrics(buildings, npcs, bag, t.facilities);
+  t.metrics = metrics(buildings, npcs, bag, t.facilities, t.logistics);
   const m = t.metrics;
-  if (m.expected > 0) {
+  const starterHome = buildings.find(
+    (building) =>
+      building.world === "overworld" &&
+      capacity(building) > 0 &&
+      !npcs.some(
+        (npc) => npc.modelType === "villager" && npc.home === building.id,
+      ),
+  );
+  // Every wholly empty home welcomes its first neighbour automatically. This
+  // also repairs homes constructed by older builds where no resident was added.
+  if (starterHome) t.migrationProgress = Math.max(t.migrationProgress, 13);
+  if (m.expected > 0 || starterHome) {
     t.migrationProgress +=
-      (m.attraction / 100) * (m.jobs > m.employed ? 1 : 0.25);
+      starterHome
+        ? 1
+        : (m.attraction / 100) * (m.jobs > m.employed ? 1 : 0.25);
     if (t.migrationProgress >= 14 && npcs.length < 500) {
-      const home = buildings.find(
+      const home = starterHome || buildings.find(
         (b) =>
           b.world === "overworld" &&
           capacity(b) > npcs.filter((n) => n.home === b.id).length,
@@ -871,7 +913,7 @@ export function simulateTown(input: SimInput): SimOutput {
       t.departProgress = 0;
     }
   } else t.departProgress = 0;
-  t.metrics = metrics(buildings, npcs, bag, t.facilities);
+  t.metrics = metrics(buildings, npcs, bag, t.facilities, t.logistics);
   t.peakPopulation = Math.max(t.peakPopulation, t.metrics.population);
   const next = townLevels[t.level];
   if (

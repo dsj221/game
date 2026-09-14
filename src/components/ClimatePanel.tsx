@@ -1,3 +1,5 @@
+import {WeatherForecastPanel} from "./WeatherForecastPanel";
+import {spendableBag} from "../systems/logistics";
 import { HydrologyPanel } from './HydrologyPanel';
 import { useTownStore as T } from "../stores/useTownStore";
 import { useResourceStore as R } from "../stores";
@@ -34,6 +36,7 @@ export function ClimatePanel() {
         冬季每位居民每天用 1 木材取暖；农田冬季效率为
         45%。泥路使货运通行耗时增加至2.5倍。水井需要附近河道补给；连通水渠引水灌溉，断流后消耗存水。
       </p>
+      <WeatherForecastPanel/>
       <HydrologyPanel/>
       <details>
         <summary>地块与水渠工程 · {t.climate?.cells.length || 0} 处</summary>
@@ -50,14 +53,14 @@ export function ClimatePanel() {
             }[c.scar || ""] || "正常"}{" "}
             <button
               disabled={
-                c.canal || resources.bag.wood < 5 || resources.bag.stone < 5
+                c.canal || spendableBag(T.getState(),resources.bag).wood < 5 || spendableBag(T.getState(),resources.bag).stone < 5
               }
               onClick={() => {
                 const r = R.getState(),
                   next = canalProject(
                     T.getState(),
-                    r.bag.wood,
-                    r.bag.stone,
+                    spendableBag(T.getState(),r.bag).wood,
+                    spendableBag(T.getState(),r.bag).stone,
                     c.x,
                     c.z,
                   );

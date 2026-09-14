@@ -1,3 +1,4 @@
+import { validTransport } from "./logistics";
 import { validSchedule } from "./workSchedule";
 import { migrateMainWorld } from "./mainWorld";
 import {
@@ -387,38 +388,171 @@ export function validate(data: unknown): ReturnType<typeof snapshot> {
       "历史日报无效",
     );
   if (d.town.climate) {
-    assert(num(d.town.climate.day, 1) && Array.isArray(d.town.climate.cells), "季节数据无效");
-    for (const c of d.town.climate.cells) assert(num(c.x, -10000, 10000) && num(c.z, -10000, 10000) && num(c.water, 0, 100) && typeof c.canal === "boolean" && [null, "mud", "cracks", "stubble", "snow", "ribbons"].includes(c.scar), "地块痕迹无效");
+    assert(
+      num(d.town.climate.day, 1) && Array.isArray(d.town.climate.cells),
+      "季节数据无效",
+    );
+    for (const c of d.town.climate.cells)
+      assert(
+        num(c.x, -10000, 10000) &&
+          num(c.z, -10000, 10000) &&
+          num(c.water, 0, 100) &&
+          typeof c.canal === "boolean" &&
+          [null, "mud", "cracks", "stubble", "snow", "ribbons"].includes(
+            c.scar,
+          ),
+        "地块痕迹无效",
+      );
   }
-  if(d.town.logistics) {
-    const l=d.town.logistics;
-    assert(l.stores && typeof l.stores === 'object' && Array.isArray(l.haulers) && l.haulers.length <= 10000 && num(l.delivered) && num(l.dispatchCursor), "货运数据无效");
-    const validPoint=(p:{x:number;z:number})=>p&&Number.isInteger(p.x)&&Number.isInteger(p.z)&&num(p.x,-10000,10000)&&num(p.z,-10000,10000);
-    for(const [id,s] of Object.entries(l.stores)) {
-      assert(s && s.id===id && validPoint(s) && ['overworld','nether','end'].includes(s.world) && [0,1,2].includes(s.priority) && num(s.capacity) && [s.warehouse,s.salvage,s.active,s.blocked].every(v=>typeof v==='boolean'),"建筑库存无效");
-      for(const stock of [s.inside,s.outside]) {assert(stock&&typeof stock==='object',"货物数据无效");for(const [r,n] of Object.entries(stock))assert(Object.hasOwn(emptyBag(),r)&&num(n),"货物数量无效");}
+  if (d.town.logistics) {
+    const l = d.town.logistics;
+    assert(
+      l.stores &&
+        typeof l.stores === "object" &&
+        Array.isArray(l.haulers) &&
+        l.haulers.length <= 10000 &&
+        num(l.delivered) &&
+        num(l.dispatchCursor),
+      "货运数据无效",
+    );
+    const validPoint = (p: { x: number; z: number }) =>
+      p &&
+      Number.isInteger(p.x) &&
+      Number.isInteger(p.z) &&
+      num(p.x, -10000, 10000) &&
+      num(p.z, -10000, 10000);
+    for (const [id, s] of Object.entries(l.stores)) {
+      assert(
+        s &&
+          s.id === id &&
+          validPoint(s) &&
+          ["overworld", "nether", "end"].includes(s.world) &&
+          [0, 1, 2].includes(s.priority) &&
+          num(s.capacity) &&
+          [s.warehouse, s.salvage, s.active, s.blocked].every(
+            (v) => typeof v === "boolean",
+          ),
+        "建筑库存无效",
+      );
+      if (s.transport) assert(validTransport(s.transport), "运力配置无效");
+      if (s.transportCosts)
+        assert(
+          num(s.transportCosts.day) &&
+            num(s.transportCosts.wages) &&
+            num(s.transportCosts.maintenance),
+          "运力费用无效",
+        );
+      if (s.rules) {
+        assert(typeof s.rules === "object", "仓储规则无效");
+        for (const [r, rule] of Object.entries(s.rules) as [string, any][])
+          assert(
+            Object.hasOwn(emptyBag(), r) &&
+              rule &&
+              typeof rule.allowed === "boolean" &&
+              num(rule.minimum) &&
+              num(rule.target) &&
+              rule.minimum <= rule.target &&
+              (s.salvage || rule.target <= s.capacity),
+            "仓储规则无效",
+          );
+      }
+      if (s.production) {
+        assert(
+          num(s.production.day) &&
+            s.production.amounts &&
+            typeof s.production.amounts === "object",
+          "产量记录无效",
+        );
+        for (const [r, n] of Object.entries(s.production.amounts))
+          assert(Object.hasOwn(emptyBag(), r) && num(n), "产量记录无效");
+      }
+      for (const stock of [s.inside, s.outside]) {
+        assert(stock && typeof stock === "object", "货物数据无效");
+        for (const [r, n] of Object.entries(stock))
+          assert(Object.hasOwn(emptyBag(), r) && num(n), "货物数量无效");
+      }
     }
-    const haulerIds=new Set<string>();
-    for(const h of l.haulers) {
-      assert(h&&typeof h.id==='string'&&!haulerIds.has(h.id)&&typeof h.home==='string'&&l.stores[h.home]&&validPoint(h.position)&&Array.isArray(h.route)&&h.route.length<=4500&&h.route.every(validPoint)&&num(h.amount,0,h.cart?8:4)&&num(h.progress)&&typeof h.cart==='boolean'&&typeof h.loaded==='boolean',"搬运员数据无效");
+    const haulerIds = new Set<string>();
+    for (const h of l.haulers) {
+      assert(
+        h &&
+          typeof h.id === "string" &&
+          !haulerIds.has(h.id) &&
+          typeof h.home === "string" &&
+          l.stores[h.home] &&
+          validPoint(h.position) &&
+          Array.isArray(h.route) &&
+          h.route.length <= 4500 &&
+          h.route.every(validPoint) &&
+          num(h.amount, 0, h.cart ? 8 : 4) &&
+          num(h.progress) &&
+          typeof h.cart === "boolean" &&
+          typeof h.loaded === "boolean",
+        "搬运员数据无效",
+      );
       haulerIds.add(h.id);
-      assert(['空闲','前往取货','运送货物','道路中断','等待通行','仓库暂停'].includes(h.status),"运输状态无效");
-      if(h.destination)assert(typeof h.source==='string'&&typeof h.destination==='string'&&typeof h.resource==='string'&&Object.hasOwn(emptyBag(),h.resource),"运输任务无效");
-      if(h.loaded)assert(h.destination&&h.resource&&h.amount>0,"在途货物无效");
+      assert(
+        [
+          "空闲",
+          "前往取货",
+          "运送货物",
+          "道路中断",
+          "等待通行",
+          "仓库暂停",
+          "下班休息",
+        ].includes(h.status),
+        "运输状态无效",
+      );
+      if (h.destination)
+        assert(
+          typeof h.source === "string" &&
+            typeof h.destination === "string" &&
+            typeof h.resource === "string" &&
+            Object.hasOwn(emptyBag(), h.resource),
+          "运输任务无效",
+        );
+      if (h.loaded)
+        assert(h.destination && h.resource && h.amount > 0, "在途货物无效");
     }
   }
-  if(d.town.hydrology) {
-    const h=d.town.hydrology;
-    assert(Array.isArray(h.reaches) && h.reaches.length <= 10000 && num(h.gate,0,1), "河道与闸门数据无效");
-    const keys=new Set<string>();
-    for(const r of h.reaches) {
-      assert(r.x===-6 && d.world.tiles.overworld.some(t=>Math.abs(t.x*3-r.x)<=1&&Math.abs(t.z*3-r.z)<=1) && Number.isInteger(r.z) && num(r.z,-10000,10000) && num(r.volume,0,10000) && num(r.flow,0,10000), "河道水量无效");
-      const key=r.x+","+r.z;assert(!keys.has(key),"河道重复");keys.add(key);
+  if (d.town.hydrology) {
+    const h = d.town.hydrology;
+    assert(
+      Array.isArray(h.reaches) &&
+        h.reaches.length <= 10000 &&
+        num(h.gate, 0, 1),
+      "河道与闸门数据无效",
+    );
+    const keys = new Set<string>();
+    for (const r of h.reaches) {
+      assert(
+        r.x === -6 &&
+          d.world.tiles.overworld.some(
+            (t) => Math.abs(t.x * 3 - r.x) <= 1 && Math.abs(t.z * 3 - r.z) <= 1,
+          ) &&
+          Number.isInteger(r.z) &&
+          num(r.z, -10000, 10000) &&
+          num(r.volume, 0, 10000) &&
+          num(r.flow, 0, 10000),
+        "河道水量无效",
+      );
+      const key = r.x + "," + r.z;
+      assert(!keys.has(key), "河道重复");
+      keys.add(key);
     }
-    assert(h.damZ===null || h.reaches.some(r=>r.z===h.damZ),"闸门位置无效");
-    for(const value of [h.inflow,h.outflow,h.evaporation,h.irrigation])assert(num(value,0,100000),"水量收支无效");
+    assert(
+      h.damZ === null || h.reaches.some((r) => r.z === h.damZ),
+      "闸门位置无效",
+    );
+    for (const value of [h.inflow, h.outflow, h.evaporation, h.irrigation])
+      assert(num(value, 0, 100000), "水量收支无效");
   }
-  if(d.town.climate)for(const c of d.town.climate.cells)assert(c.channelWater===undefined||num(c.channelWater,0,10),"水渠蓄水无效");
+  if (d.town.climate)
+    for (const c of d.town.climate.cells)
+      assert(
+        c.channelWater === undefined || num(c.channelWater, 0, 10),
+        "水渠蓄水无效",
+      );
   for (const e of d.town.events)
     assert(
       ["rain", "festival", "flu", "drought", "harvest"].includes(e.type) &&
@@ -466,6 +600,7 @@ export function validate(data: unknown): ReturnType<typeof snapshot> {
     d.npcs,
     d.resources.bag,
     d.town.facilities,
+    d.town.logistics,
   );
   return d;
 }
@@ -492,6 +627,7 @@ function apply(d: ReturnType<typeof snapshot>) {
     d.npcs,
     d.resources.bag,
     d.town.facilities,
+    d.town.logistics,
   );
   R.setState(d.resources);
   W.setState({ ...d.world, interior: false });

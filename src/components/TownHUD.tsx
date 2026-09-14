@@ -319,6 +319,7 @@ export function TownNews() {
   const t = T();
   return (
     <div className="town-news">
+      <button onClick={()=>{U.setState({logisticsOverlay:!U.getState().logisticsOverlay});panel("daily");}}>物流地图与主链诊断</button>
       <button onClick={() => panel("daily")}><b>{seasonNames[seasonAt(t.day)]} · {seasonDay(t.day)}/14 天</b><small>{forecast(t.day).map(e=>e.title+' · '+(e.startDay-t.day)+' 天后').join(' / ') || '天气与地块 · 查看准备事项'}</small></button>
       {t.legacy && (
         <button onClick={() => U.setState({ modal: "settings" })}>

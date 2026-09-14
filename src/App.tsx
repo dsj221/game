@@ -11,7 +11,6 @@ import {
   HelpCircle,
   Leaf,
   MousePointer2,
-  Sparkles,
   Plus,
   RotateCcw,
   Save,
@@ -52,7 +51,6 @@ import {
   panel,
   studioAction,
   switchWorld,
-  selectBuilding,
 } from "./game/actions";
 import { worlds, defs } from "./data/definitions";
 import { influenceFor } from "./systems/buildingInfluence";
@@ -65,7 +63,6 @@ import { expansionPrice, expansionTotal } from "./systems/economy";
 import { save, exportSave } from "./systems/persistence";
 import { format } from "./utils/format";
 import type { WorldId } from "./types";
-import { spatialReactions } from "./systems/spatialReactions";
 import { seasons, seasonIndex } from './data/artDirection';
 class RenderBoundary extends Component<
   { children: ReactNode },
@@ -101,11 +98,6 @@ export default function App() {
   const local = b.buildings.filter(
     (v) => v.world === w.current && v.type !== "road",
   );
-  const blockReactions = spatialReactions(
-    b.buildings.filter((building) => building.world === w.current),
-    defs,
-  );
-  const featuredReaction = blockReactions.at(-1);
   const dark =
     w.current !== "overworld" ||
     daylight(s.hour, s.weather.includes("dusk")) < 0.5;
@@ -267,48 +259,6 @@ export default function App() {
                 每完成一次林间馈赠，单次获取金币永久 +1。
               </span>
             </div>
-          )}
-          {!w.interior && !ui.placement && (
-            <section
-              className={`block-story ${featuredReaction ? "discovered" : "empty"}`}
-              aria-label="块间手记"
-            >
-              <span className="eyebrow">
-                <Sparkles size={13} /> 块间手记 · {blockReactions.length}
-              </span>
-              {featuredReaction ? (
-                <>
-                  <b>{featuredReaction.name}</b>
-                  <small>{featuredReaction.description}</small>
-                  <button
-                    onClick={() => {
-                      const building = b.buildings.find(
-                        (item) => item.id === featuredReaction.buildingA,
-                      );
-                      if (!building) return;
-                      selectBuilding(building.id);
-                      U.setState({
-                        cameraFocus: {
-                          x: building.x,
-                          z: building.z,
-                          nonce: Date.now(),
-                        },
-                      });
-                    }}
-                  >
-                    查看这段街巷
-                  </button>
-                </>
-              ) : (
-                <>
-                  <b>让建筑共享一条边</b>
-                  <small>试试把麦田贴近磨坊，或让住宅挨着绿地。</small>
-                  <button onClick={() => panel("shop")}>
-                    开始规划第一个街区
-                  </button>
-                </>
-              )}
-            </section>
           )}
           {ui.placement && ui.placement !== "expand" && (
             <PlacementBar key={`${ui.placement}:${ui.moving || "new"}`} />
